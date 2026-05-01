@@ -44,6 +44,29 @@ Il sito salva automaticamente i progressi nel browser con `localStorage`: ordine
 - `src/utils/quizEngine.js`: progressi, validazione e mappa domande;
 - `src/styles.css`: stile responsive.
 
+## Deploy su GitHub Pages
+
+Per generare la build locale:
+
+```bash
+npm run build
+```
+
+Il deploy automatico usa GitHub Actions con il workflow `.github/workflows/deploy.yml`.
+Ogni push su `main` esegue `npm ci`, `npm run build` e pubblica la cartella `dist` su GitHub Pages.
+
+Su GitHub controlla questa impostazione:
+
+1. Vai nella repository `MicheleCarb/quiz-infermieri`.
+2. Apri `Settings` -> `Pages`.
+3. In `Build and deployment`, seleziona `Source: GitHub Actions`.
+
+URL finale del sito:
+
+```text
+https://MicheleCarb.github.io/quiz-infermieri/
+```
+
 ---
 
 # Parser quiz ASL Bari

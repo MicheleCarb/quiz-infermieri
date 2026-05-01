@@ -6,7 +6,7 @@ import { shuffle } from './utils/shuffle';
 import { clearProgress, loadProgress, saveProgress } from './utils/storage';
 import { buildQuestionMap, createInitialProgress, getPercent, sanitizeProgress } from './utils/quizEngine';
 
-const QUESTIONS_URL = '/data/questions.json';
+const QUESTIONS_URL = `${import.meta.env.BASE_URL}data/questions.json`;
 
 export default function App() {
   const [status, setStatus] = useState('loading');
