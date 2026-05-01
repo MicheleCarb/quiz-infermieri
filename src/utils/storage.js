@@ -16,6 +16,9 @@ export function loadProgress() {
       wrongCount: parsed.wrongCount || 0,
       answeredIds: Array.isArray(parsed.answeredIds) ? parsed.answeredIds : [],
       mistakes: parsed.mistakes && typeof parsed.mistakes === 'object' ? parsed.mistakes : {},
+      mistakeHistory: parsed.mistakeHistory && typeof parsed.mistakeHistory === 'object'
+        ? parsed.mistakeHistory
+        : {},
     };
   } catch (error) {
     console.warn('Progressi localStorage corrotti, verranno ignorati.', error);

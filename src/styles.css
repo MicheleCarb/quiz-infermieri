@@ -280,6 +280,8 @@ button {
 }
 
 .actions {
+  display: grid;
+  gap: 10px;
   margin-top: 16px;
 }
 
@@ -300,6 +302,56 @@ button {
 .final {
   display: grid;
   gap: 16px;
+}
+
+.history {
+  display: grid;
+  gap: 18px;
+}
+
+.history__top {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.history__list {
+  display: grid;
+  gap: 12px;
+}
+
+.history-item {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #d9e0e8;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.history-item h2 {
+  margin: 0;
+  color: #111827;
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+.history-item__answers {
+  display: grid;
+  gap: 8px;
+}
+
+.history-item__answer {
+  cursor: default;
+}
+
+.history-item__answer--neutral {
+  background: #ffffff;
+}
+
+.history-item__wrong-icon {
+  background: #eef2f6;
+  color: #64748b;
 }
 
 .final__actions {
@@ -333,7 +385,7 @@ button {
   }
 
   .final__grid {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .quiz-card,
@@ -349,5 +401,11 @@ button {
     grid-template-columns: 1fr auto;
     display: grid;
     align-items: center;
+  }
+
+  .history__top {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
   }
 }

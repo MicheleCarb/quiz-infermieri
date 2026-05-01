@@ -27,6 +27,7 @@ export function createInitialProgress(questions) {
     wrongCount: 0,
     answeredIds: [],
     mistakes: {},
+    mistakeHistory: {},
   };
 }
 
@@ -53,6 +54,7 @@ export function sanitizeProgress(progress, questionMap, questions) {
   }
 
   const mistakes = {};
+  const mistakeHistory = {};
 
   Object.entries(progress.mistakes || {}).forEach(([id, mistake]) => {
     const normalizedId = String(id);
@@ -63,12 +65,26 @@ export function sanitizeProgress(progress, questionMap, questions) {
     }
   });
 
+  Object.entries(progress.mistakeHistory || {}).forEach(([id, mistake]) => {
+    const normalizedId = String(id);
+    if (questionMap.has(normalizedId)) {
+      mistakeHistory[normalizedId] = mistake;
+    }
+  });
+
+  Object.entries(mistakes).forEach(([id, mistake]) => {
+    if (!mistakeHistory[id]) {
+      mistakeHistory[id] = mistake;
+    }
+  });
+
   return {
     ...progress,
     questionOrder: usableOrder,
     currentIndex,
     answeredIds,
     mistakes,
+    mistakeHistory,
   };
 }
 

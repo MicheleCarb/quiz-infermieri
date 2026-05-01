@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import QuizCard from './components/QuizCard.jsx';
 import StatsBar from './components/StatsBar.jsx';
 import ReviewMistakesButton from './components/ReviewMistakesButton.jsx';
+import MistakeHistory from './components/MistakeHistory.jsx';
 import { shuffle } from './utils/shuffle';
 import { clearProgress, loadProgress, saveProgress } from './utils/storage';
 import { buildQuestionMap, createInitialProgress, getPercent, sanitizeProgress } from './utils/quizEngine';
@@ -24,13 +25,21 @@ export default function App() {
   const [reviewOrder, setReviewOrder] = useState([]);
   const [reviewIndex, setReviewIndex] = useState(0);
   const [reviewAttempt, setReviewAttempt] = useState(0);
+  const [historyMode, setHistoryMode] = useState(false);
 
   const questionMap = useMemo(() => buildQuestionMap(questions), [questions]);
   const total = questions.length;
   const mistakesCount = progress ? Object.keys(progress.mistakes).length : 0;
+  const historyItems = useMemo(
+    () => Object.values(progress?.mistakeHistory || {}).sort((a, b) => {
+      return new Date(b.timestamp || 0) - new Date(a.timestamp || 0);
+    }),
+    [progress]
+  );
+  const historyCount = historyItems.length;
   const completedCount = progress ? Math.min(progress.answeredIds.length, total) : 0;
   const hasProgress = progress
-    ? completedCount > 0 || progress.correctCount > 0 || progress.wrongCount > 0 || mistakesCount > 0
+    ? completedCount > 0 || progress.correctCount > 0 || progress.wrongCount > 0 || mistakesCount > 0 || historyCount > 0
     : false;
 
   const currentQuestionId = reviewMode
@@ -129,18 +138,24 @@ export default function App() {
     setFeedbackGif(getRandomMonkeyGif(nextResult, monkeyGifs));
 
     setProgress((previous) => {
-      const next = { ...previous, mistakes: { ...previous.mistakes } };
+      const next = {
+        ...previous,
+        mistakes: { ...previous.mistakes },
+        mistakeHistory: { ...previous.mistakeHistory },
+      };
+      const mistakeRecord = {
+        questionId,
+        selectedAnswer: selectedLabel,
+        correctAnswer: correctLabel,
+        timestamp: new Date().toISOString(),
+      };
 
       if (reviewMode) {
         if (isCorrect) {
           delete next.mistakes[questionId];
         } else {
-          next.mistakes[questionId] = {
-            questionId,
-            selectedAnswer: selectedLabel,
-            correctAnswer: correctLabel,
-            timestamp: new Date().toISOString(),
-          };
+          next.mistakes[questionId] = mistakeRecord;
+          next.mistakeHistory[questionId] = mistakeRecord;
         }
         return next;
       }
@@ -156,12 +171,8 @@ export default function App() {
       if (isCorrect) {
         delete next.mistakes[questionId];
       } else {
-        next.mistakes[questionId] = {
-          questionId,
-          selectedAnswer: selectedLabel,
-          correctAnswer: correctLabel,
-          timestamp: new Date().toISOString(),
-        };
+        next.mistakes[questionId] = mistakeRecord;
+        next.mistakeHistory[questionId] = mistakeRecord;
       }
 
       return next;
@@ -214,6 +225,7 @@ export default function App() {
     const freshProgress = createInitialProgress(questions);
     setProgress(freshProgress);
     saveProgress(freshProgress);
+    setHistoryMode(false);
     exitReviewMode();
   }
 
@@ -268,13 +280,21 @@ export default function App() {
         wrongCount={progress.wrongCount}
       />
 
-      {isFinished ? (
+      {historyMode ? (
+        <MistakeHistory
+          historyItems={historyItems}
+          questionMap={questionMap}
+          onBack={() => setHistoryMode(false)}
+        />
+      ) : isFinished ? (
         <FinalScreen
           total={total}
           correctCount={progress.correctCount}
           wrongCount={progress.wrongCount}
           mistakesCount={mistakesCount}
+          historyCount={historyCount}
           onReview={startReviewMode}
+          onHistory={() => setHistoryMode(true)}
           onReset={resetQuiz}
         />
       ) : isReviewFinished || (reviewMode && reviewOrder.length === 0) ? (
@@ -311,9 +331,17 @@ export default function App() {
         </section>
       )}
 
-      {!reviewMode && !isFinished && (
+      {!reviewMode && !isFinished && !historyMode && (
         <div className="actions">
           <ReviewMistakesButton count={mistakesCount} onClick={startReviewMode} />
+          <button
+            className="button button--secondary"
+            type="button"
+            onClick={() => setHistoryMode(true)}
+            disabled={historyCount === 0}
+          >
+            Storico errori{historyCount > 0 ? ` (${historyCount})` : ''}
+          </button>
         </div>
       )}
     </Shell>
@@ -324,7 +352,7 @@ function Shell({ children }) {
   return <div className="app-shell">{children}</div>;
 }
 
-function FinalScreen({ total, correctCount, wrongCount, mistakesCount, onReview, onReset }) {
+function FinalScreen({ total, correctCount, wrongCount, mistakesCount, historyCount, onReview, onHistory, onReset }) {
   const accuracy = getPercent(correctCount, correctCount + wrongCount);
 
   return (
@@ -337,11 +365,17 @@ function FinalScreen({ total, correctCount, wrongCount, mistakesCount, onReview,
         <div><span>Risposte sbagliate</span><strong>{wrongCount}</strong></div>
         <div><span>Correttezza</span><strong>{accuracy}%</strong></div>
         <div><span>Errori da ripassare</span><strong>{mistakesCount}</strong></div>
+        <div><span>Storico errori</span><strong>{historyCount}</strong></div>
       </div>
       <div className="final__actions">
         {mistakesCount > 0 && (
           <button className="button button--secondary" type="button" onClick={onReview}>
             Ripassa errori
+          </button>
+        )}
+        {historyCount > 0 && (
+          <button className="button button--secondary" type="button" onClick={onHistory}>
+            Storico errori
           </button>
         )}
         <button className="button button--danger" type="button" onClick={onReset}>
