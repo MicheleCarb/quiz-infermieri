@@ -60,21 +60,21 @@ export default function QuizCard({
       {result && (
         <div className={`result result--${result}`} role="status">
           <span>{result === 'correct' ? 'Corretto' : 'Sbagliato'}</span>
-          <FeedbackGif gif={feedbackGif} />
         </div>
       )}
 
       <div className="quiz-card__footer">
-        <p>
-          Completate: {completedCount} / {total}
-          <br />
-          Errori da ripassare: {mistakesCount}
-        </p>
         {selectedAnswer && (
           <button className="button button--primary" type="button" onClick={onNext}>
             {reviewMode ? 'Prossimo errore' : 'Prossima domanda'}
           </button>
         )}
+        <FeedbackGif gif={feedbackGif} />
+        <p>
+          Completate: {completedCount} / {total}
+          <br />
+          Errori da ripassare: {mistakesCount}
+        </p>
       </div>
     </article>
   );

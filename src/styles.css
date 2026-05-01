@@ -203,21 +203,17 @@ button {
 }
 
 .result {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
   margin-top: 16px;
-  min-height: 52px;
-  padding: 8px 12px;
+  padding: 10px 12px;
   border-radius: 8px;
   font-weight: 800;
 }
 
 .result__gif {
-  flex: 0 0 auto;
-  width: 36px;
-  height: 36px;
+  justify-self: center;
+  width: min(220px, 100%);
+  aspect-ratio: 1 / 1;
+  max-height: 220px;
   border-radius: 8px;
   border: 0;
   object-fit: cover;
@@ -234,8 +230,7 @@ button {
 }
 
 .quiz-card__footer {
-  display: flex;
-  flex-direction: column;
+  display: grid;
   gap: 14px;
   margin-top: 18px;
   color: #475569;
@@ -350,14 +345,9 @@ button {
     font-size: 1.55rem;
   }
 
-  .quiz-card__footer,
   .final__actions {
     grid-template-columns: 1fr auto;
     display: grid;
     align-items: center;
-  }
-
-  .quiz-card__footer {
-    display: grid;
   }
 }

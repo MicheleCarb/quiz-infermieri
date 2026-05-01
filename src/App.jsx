@@ -23,6 +23,7 @@ export default function App() {
   const [reviewMode, setReviewMode] = useState(false);
   const [reviewOrder, setReviewOrder] = useState([]);
   const [reviewIndex, setReviewIndex] = useState(0);
+  const [reviewAttempt, setReviewAttempt] = useState(0);
 
   const questionMap = useMemo(() => buildQuestionMap(questions), [questions]);
   const total = questions.length;
@@ -108,7 +109,7 @@ export default function App() {
     setSelectedAnswer(null);
     setResult(null);
     setFeedbackGif(null);
-  }, [currentQuestionId, currentQuestion]);
+  }, [currentQuestionId, currentQuestion, reviewAttempt]);
 
   useEffect(() => {
     if (progress) saveProgress(progress);
@@ -175,6 +176,7 @@ export default function App() {
       if (nextIndex >= reviewOrder.length) {
         setReviewOrder(remainingReviewIds);
         setReviewIndex(remainingReviewIds.length > 0 ? 0 : nextIndex);
+        setReviewAttempt((attempt) => attempt + 1);
       } else {
         setReviewIndex(nextIndex);
       }
@@ -193,6 +195,7 @@ export default function App() {
 
     setReviewOrder(shuffle(ids));
     setReviewIndex(0);
+    setReviewAttempt(0);
     setReviewMode(true);
   }
 
@@ -200,6 +203,7 @@ export default function App() {
     setReviewMode(false);
     setReviewOrder([]);
     setReviewIndex(0);
+    setReviewAttempt(0);
   }
 
   function resetQuiz() {
