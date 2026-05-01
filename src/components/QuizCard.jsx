@@ -1,0 +1,79 @@
+export default function QuizCard({
+  question,
+  displayIndex,
+  total,
+  answers,
+  selectedAnswer,
+  result,
+  reviewMode,
+  mistakesCount,
+  completedCount,
+  onSelectAnswer,
+  onNext,
+  onExitReview,
+}) {
+  const correctLabel = question.correctAnswer || 'A';
+
+  function answerClass(answer) {
+    if (!selectedAnswer) return 'answer';
+    if (answer.label === correctLabel) return 'answer answer--correct';
+    if (answer.label === selectedAnswer) return 'answer answer--wrong';
+    return 'answer answer--muted';
+  }
+
+  return (
+    <article className="quiz-card">
+      <div className="quiz-card__top">
+        <div>
+          <p className="eyebrow">{reviewMode ? 'Ripasso errori' : `Domanda ${displayIndex} di ${total}`}</p>
+          <p className="question-id">ID domanda: {question.id || 'non disponibile'}</p>
+        </div>
+        {reviewMode && (
+          <button className="button button--ghost" type="button" onClick={onExitReview}>
+            Torna al quiz
+          </button>
+        )}
+      </div>
+
+      <h1>{question.question || 'Domanda senza testo'}</h1>
+
+      <div className="answers" role="list">
+        {answers.length === 0 ? (
+          <p className="empty-state">Questa domanda non contiene risposte.</p>
+        ) : (
+          answers.map((answer, index) => (
+            <button
+              className={answerClass(answer)}
+              type="button"
+              key={`${answer.label}-${index}`}
+              onClick={() => onSelectAnswer(answer)}
+              disabled={Boolean(selectedAnswer)}
+            >
+              <span className="answer__index">{index + 1}</span>
+              <span>{answer.text || 'Risposta senza testo'}</span>
+            </button>
+          ))
+        )}
+      </div>
+
+      {result && (
+        <div className={`result result--${result}`} role="status">
+          {result === 'correct' ? 'Corretto' : 'Sbagliato'}
+        </div>
+      )}
+
+      <div className="quiz-card__footer">
+        <p>
+          Completate: {completedCount} / {total}
+          <br />
+          Errori da ripassare: {mistakesCount}
+        </p>
+        {selectedAnswer && (
+          <button className="button button--primary" type="button" onClick={onNext}>
+            {reviewMode ? 'Prossimo errore' : 'Prossima domanda'}
+          </button>
+        )}
+      </div>
+    </article>
+  );
+}
