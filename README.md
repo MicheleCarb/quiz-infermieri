@@ -44,6 +44,28 @@ Il sito salva automaticamente i progressi nel browser con `localStorage`: ordine
 - `src/utils/quizEngine.js`: progressi, validazione e mappa domande;
 - `src/styles.css`: stile responsive.
 
+## GIF scimmietta
+
+Per mostrare una GIF casuale nel box `Corretto` o `Sbagliato`, aggiungi i link nei file:
+
+```text
+public/monkeys/correct.txt
+public/monkeys/wrong.txt
+```
+
+Inserisci un link per riga. Le righe vuote e quelle che iniziano con `#` vengono ignorate.
+Puoi usare link diretti a immagini oppure link Tenor come `https://tenor.com/it/view/...-123456`.
+Se incolli lo snippet embed di Tenor, il sito prova comunque a leggere il valore `data-postid`.
+
+Esempio:
+
+```text
+https://tenor.com/it/view/monkey-monkey-dancing-orangutan-monkey-dance-happy-monkey-gif-12702179649294906179
+https://example.com/monkey-1.gif
+```
+
+Dopo aver modificato questi file, esegui una nuova build/deploy.
+
 ## Deploy su GitHub Pages
 
 Per generare la build locale:

@@ -203,10 +203,24 @@ button {
 }
 
 .result {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   margin-top: 16px;
-  padding: 10px 12px;
+  min-height: 52px;
+  padding: 8px 12px;
   border-radius: 8px;
   font-weight: 800;
+}
+
+.result__gif {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 0;
+  object-fit: cover;
 }
 
 .result--correct {

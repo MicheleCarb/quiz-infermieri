@@ -5,6 +5,7 @@ import ReviewMistakesButton from './components/ReviewMistakesButton.jsx';
 import { shuffle } from './utils/shuffle';
 import { clearProgress, loadProgress, saveProgress } from './utils/storage';
 import { buildQuestionMap, createInitialProgress, getPercent, sanitizeProgress } from './utils/quizEngine';
+import { getRandomMonkeyGif, loadMonkeyGifs } from './utils/monkeyGifs';
 
 const QUESTIONS_URL = `${import.meta.env.BASE_URL}data/questions.json`;
 
@@ -17,6 +18,8 @@ export default function App() {
   const [answers, setAnswers] = useState([]);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [result, setResult] = useState(null);
+  const [feedbackGif, setFeedbackGif] = useState(null);
+  const [monkeyGifs, setMonkeyGifs] = useState({ correct: [], wrong: [] });
   const [reviewMode, setReviewMode] = useState(false);
   const [reviewOrder, setReviewOrder] = useState([]);
   const [reviewIndex, setReviewIndex] = useState(0);
@@ -81,16 +84,30 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+
+    loadMonkeyGifs(import.meta.env.BASE_URL).then((gifLists) => {
+      if (!cancelled) setMonkeyGifs(gifLists);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!currentQuestion) {
       setAnswers([]);
       setSelectedAnswer(null);
       setResult(null);
+      setFeedbackGif(null);
       return;
     }
 
     setAnswers(shuffle(Array.isArray(currentQuestion.answers) ? currentQuestion.answers : []));
     setSelectedAnswer(null);
     setResult(null);
+    setFeedbackGif(null);
   }, [currentQuestionId, currentQuestion]);
 
   useEffect(() => {
@@ -106,7 +123,9 @@ export default function App() {
     const questionId = String(currentQuestion.id);
 
     setSelectedAnswer(selectedLabel);
-    setResult(isCorrect ? 'correct' : 'wrong');
+    const nextResult = isCorrect ? 'correct' : 'wrong';
+    setResult(nextResult);
+    setFeedbackGif(getRandomMonkeyGif(nextResult, monkeyGifs));
 
     setProgress((previous) => {
       const next = { ...previous, mistakes: { ...previous.mistakes } };
@@ -270,6 +289,7 @@ export default function App() {
           answers={answers}
           selectedAnswer={selectedAnswer}
           result={result}
+          feedbackGif={feedbackGif}
           reviewMode={reviewMode}
           mistakesCount={mistakesCount}
           completedCount={completedCount}

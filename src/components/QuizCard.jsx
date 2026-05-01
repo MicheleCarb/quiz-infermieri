@@ -5,6 +5,7 @@ export default function QuizCard({
   answers,
   selectedAnswer,
   result,
+  feedbackGif,
   reviewMode,
   mistakesCount,
   completedCount,
@@ -58,7 +59,8 @@ export default function QuizCard({
 
       {result && (
         <div className={`result result--${result}`} role="status">
-          {result === 'correct' ? 'Corretto' : 'Sbagliato'}
+          <span>{result === 'correct' ? 'Corretto' : 'Sbagliato'}</span>
+          <FeedbackGif gif={feedbackGif} />
         </div>
       )}
 
@@ -76,4 +78,22 @@ export default function QuizCard({
       </div>
     </article>
   );
+}
+
+function FeedbackGif({ gif }) {
+  if (!gif) return null;
+
+  if (gif.type === 'tenor') {
+    return (
+      <iframe
+        className="result__gif"
+        src={gif.src}
+        title="Monkey GIF"
+        loading="lazy"
+        allowFullScreen
+      />
+    );
+  }
+
+  return <img className="result__gif" src={gif.src} alt="" aria-hidden="true" />;
 }
