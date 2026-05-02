@@ -52,7 +52,7 @@ export default function QuizCard({
               disabled={Boolean(selectedAnswer)}
             >
               <span className="answer__index">{answerLetters[index] || String.fromCharCode(65 + index)}</span>
-              <span>{answer.text || 'Risposta senza testo'}</span>
+              <span className="answer__text">{answer.text || 'Risposta senza testo'}</span>
             </button>
           ))
         )}

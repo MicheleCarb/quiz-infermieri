@@ -266,11 +266,6 @@ export default function App() {
           <p className="source">{metadata?.source || 'Quiz infermieristica'}</p>
           <h1>I quiz di Kikka 🐵</h1>
         </div>
-        {hasProgress && (
-          <button className="button button--danger" type="button" onClick={resetQuiz}>
-            Ricomincia da capo
-          </button>
-        )}
       </header>
 
       <StatsBar
@@ -295,7 +290,6 @@ export default function App() {
           historyCount={historyCount}
           onReview={startReviewMode}
           onHistory={() => setHistoryMode(true)}
-          onReset={resetQuiz}
         />
       ) : isReviewFinished || (reviewMode && reviewOrder.length === 0) ? (
         <section className="panel panel--message">
@@ -335,12 +329,19 @@ export default function App() {
         <div className="actions">
           <ReviewMistakesButton count={mistakesCount} onClick={startReviewMode} />
           <button
-            className="button button--secondary"
+            className="button button--quiet"
             type="button"
             onClick={() => setHistoryMode(true)}
             disabled={historyCount === 0}
           >
             Storico errori{historyCount > 0 ? ` (${historyCount})` : ''}
+          </button>
+        </div>
+      )}
+      {hasProgress && !reviewMode && !historyMode && !isFinished && currentQuestion && (
+        <div className="reset-actions">
+          <button className="button button--danger button--danger-soft" type="button" onClick={resetQuiz}>
+            Ricomincia da capo
           </button>
         </div>
       )}
@@ -352,7 +353,7 @@ function Shell({ children }) {
   return <div className="app-shell">{children}</div>;
 }
 
-function FinalScreen({ total, correctCount, wrongCount, mistakesCount, historyCount, onReview, onHistory, onReset }) {
+function FinalScreen({ total, correctCount, wrongCount, mistakesCount, historyCount, onReview, onHistory }) {
   const accuracy = getPercent(correctCount, correctCount + wrongCount);
 
   return (
@@ -369,18 +370,15 @@ function FinalScreen({ total, correctCount, wrongCount, mistakesCount, historyCo
       </div>
       <div className="final__actions">
         {mistakesCount > 0 && (
-          <button className="button button--secondary" type="button" onClick={onReview}>
+          <button className="button button--primary" type="button" onClick={onReview}>
             Ripassa errori
           </button>
         )}
         {historyCount > 0 && (
-          <button className="button button--secondary" type="button" onClick={onHistory}>
+          <button className="button button--quiet" type="button" onClick={onHistory}>
             Storico errori
           </button>
         )}
-        <button className="button button--danger" type="button" onClick={onReset}>
-          Ricomincia da capo
-        </button>
       </div>
     </section>
   );
