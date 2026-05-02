@@ -527,15 +527,17 @@ export default function App() {
           </button>
         </div>
       )}
-      <TransferProgress
-        fileInputRef={fileInputRef}
-        open={transferOpen}
-        message={transferMessage}
-        onToggle={setTransferOpen}
-        onExport={handleExportProgress}
-        onChooseImportFile={handleChooseImportFile}
-        onImportFile={handleImportFile}
-      />
+      {!reviewMode && !historyMode && !isFinished && currentQuestion && (
+        <TransferProgress
+          fileInputRef={fileInputRef}
+          open={transferOpen}
+          message={transferMessage}
+          onToggle={setTransferOpen}
+          onExport={handleExportProgress}
+          onChooseImportFile={handleChooseImportFile}
+          onImportFile={handleImportFile}
+        />
+      )}
       {hasProgress && !reviewMode && !historyMode && !isFinished && currentQuestion && (
         <div className="reset-actions">
           <button className="button button--danger button--danger-soft" type="button" onClick={resetQuiz}>
