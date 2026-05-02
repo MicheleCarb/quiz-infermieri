@@ -28,6 +28,7 @@ export function createInitialProgress(questions) {
     answeredIds: [],
     mistakes: {},
     mistakeHistory: {},
+    markedForReviewIds: [],
   };
 }
 
@@ -55,6 +56,9 @@ export function sanitizeProgress(progress, questionMap, questions) {
 
   const mistakes = {};
   const mistakeHistory = {};
+  const markedForReviewIds = Array.isArray(progress.markedForReviewIds)
+    ? [...new Set(progress.markedForReviewIds.map(String))].filter((id) => questionMap.has(id))
+    : [];
 
   Object.entries(progress.mistakes || {}).forEach(([id, mistake]) => {
     const normalizedId = String(id);
@@ -85,6 +89,7 @@ export function sanitizeProgress(progress, questionMap, questions) {
     answeredIds,
     mistakes,
     mistakeHistory,
+    markedForReviewIds,
   };
 }
 

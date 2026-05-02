@@ -9,9 +9,11 @@ export default function QuizCard({
   reviewMode,
   mistakesCount,
   completedCount,
+  isMarkedForReview,
   onSelectAnswer,
   onNext,
   onExitReview,
+  onToggleMarked,
 }) {
   const correctLabel = question.correctAnswer || 'A';
   const answerLetters = ['A', 'B', 'C'];
@@ -30,11 +32,21 @@ export default function QuizCard({
           <p className="eyebrow">{reviewMode ? 'Ripasso errori' : `Domanda ${displayIndex} di ${total}`}</p>
           <p className="question-id">ID domanda: {question.id || 'non disponibile'}</p>
         </div>
-        {reviewMode && (
-          <button className="button button--ghost" type="button" onClick={onExitReview}>
-            Torna al quiz
+        <div className="quiz-card__top-actions">
+          <button
+            className={`button button--mark${isMarkedForReview ? ' button--mark-active' : ''}`}
+            type="button"
+            onClick={onToggleMarked}
+            aria-pressed={isMarkedForReview}
+          >
+            {isMarkedForReview ? '★ Segnata' : '☆ Segna'}
           </button>
-        )}
+          {reviewMode && (
+            <button className="button button--ghost" type="button" onClick={onExitReview}>
+              Torna al quiz
+            </button>
+          )}
+        </div>
       </div>
 
       <h1>{question.question || 'Domanda senza testo'}</h1>

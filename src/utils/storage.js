@@ -19,6 +19,7 @@ export function loadProgress() {
       mistakeHistory: parsed.mistakeHistory && typeof parsed.mistakeHistory === 'object'
         ? parsed.mistakeHistory
         : {},
+      markedForReviewIds: Array.isArray(parsed.markedForReviewIds) ? parsed.markedForReviewIds : [],
     };
   } catch (error) {
     console.warn('Progressi localStorage corrotti, verranno ignorati.', error);

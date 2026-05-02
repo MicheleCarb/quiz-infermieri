@@ -36,22 +36,32 @@ export default function App() {
   const questionMap = useMemo(() => buildQuestionMap(questions), [questions]);
   const total = questions.length;
   const mistakesCount = progress ? Object.keys(progress.mistakes).length : 0;
+  const markedForReviewIds = progress?.markedForReviewIds || [];
   const historyItems = useMemo(
     () => Object.values(progress?.mistakeHistory || {}).sort((a, b) => {
       return new Date(b.timestamp || 0) - new Date(a.timestamp || 0);
     }),
     [progress]
   );
-  const historyCount = historyItems.length;
+  const reviewQuestionsCount = progress
+    ? new Set([...Object.keys(progress.mistakeHistory || {}), ...markedForReviewIds]).size
+    : 0;
   const completedCount = progress ? Math.min(progress.answeredIds.length, total) : 0;
   const hasProgress = progress
-    ? completedCount > 0 || progress.correctCount > 0 || progress.wrongCount > 0 || mistakesCount > 0 || historyCount > 0
+    ? completedCount > 0
+      || progress.correctCount > 0
+      || progress.wrongCount > 0
+      || mistakesCount > 0
+      || reviewQuestionsCount > 0
     : false;
 
   const currentQuestionId = reviewMode
     ? reviewOrder[reviewIndex]
     : progress?.questionOrder[progress.currentIndex];
   const currentQuestion = currentQuestionId ? questionMap.get(String(currentQuestionId)) : null;
+  const isCurrentQuestionMarked = currentQuestionId
+    ? markedForReviewIds.includes(String(currentQuestionId))
+    : false;
   const isFinished = !reviewMode && progress && progress.currentIndex >= progress.questionOrder.length;
   const isReviewFinished = reviewMode && reviewOrder.length > 0 && reviewIndex >= reviewOrder.length;
   const showStickyNext = Boolean(
@@ -192,6 +202,35 @@ export default function App() {
 
       return next;
     });
+  }
+
+  function handleToggleMarkedForReview() {
+    if (!currentQuestionId) return;
+
+    closeTransferProgress();
+    const questionId = String(currentQuestionId);
+
+    setProgress((previous) => {
+      const markedIds = new Set(previous.markedForReviewIds || []);
+
+      if (markedIds.has(questionId)) {
+        markedIds.delete(questionId);
+      } else {
+        markedIds.add(questionId);
+      }
+
+      return {
+        ...previous,
+        markedForReviewIds: [...markedIds],
+      };
+    });
+  }
+
+  function handleUnmarkForReview(questionId) {
+    setProgress((previous) => ({
+      ...previous,
+      markedForReviewIds: (previous.markedForReviewIds || []).filter((id) => String(id) !== String(questionId)),
+    }));
   }
 
   function handleNext() {
@@ -372,6 +411,9 @@ export default function App() {
       answeredIds: parsed.progress.answeredIds.map(String),
       mistakes: parsed.progress.mistakes || {},
       mistakeHistory: parsed.progress.mistakeHistory || {},
+      markedForReviewIds: Array.isArray(parsed.progress.markedForReviewIds)
+        ? parsed.progress.markedForReviewIds.map(String)
+        : [],
     };
     const sanitized = sanitizeProgress(importedProgress, questionMap, questions);
 
@@ -394,6 +436,10 @@ export default function App() {
     if (
       importedProgress.mistakeHistory !== undefined
       && !isPlainObject(importedProgress.mistakeHistory)
+    ) return false;
+    if (
+      importedProgress.markedForReviewIds !== undefined
+      && !Array.isArray(importedProgress.markedForReviewIds)
     ) return false;
 
     const seen = new Set();
@@ -467,8 +513,10 @@ export default function App() {
       {historyMode ? (
         <MistakeHistory
           historyItems={historyItems}
+          markedForReviewIds={markedForReviewIds}
           questionMap={questionMap}
           onBack={() => setHistoryMode(false)}
+          onUnmark={handleUnmarkForReview}
         />
       ) : isFinished ? (
         <FinalScreen
@@ -476,7 +524,7 @@ export default function App() {
           correctCount={progress.correctCount}
           wrongCount={progress.wrongCount}
           mistakesCount={mistakesCount}
-          historyCount={historyCount}
+          reviewQuestionsCount={reviewQuestionsCount}
           onReview={startReviewMode}
           onHistory={openHistoryMode}
         />
@@ -500,9 +548,11 @@ export default function App() {
           reviewMode={reviewMode}
           mistakesCount={mistakesCount}
           completedCount={completedCount}
+          isMarkedForReview={isCurrentQuestionMarked}
           onSelectAnswer={handleSelectAnswer}
           onNext={handleNext}
           onExitReview={exitReviewMode}
+          onToggleMarked={handleToggleMarkedForReview}
         />
       ) : (
         <section className="panel panel--message">
@@ -521,9 +571,9 @@ export default function App() {
             className="button button--quiet"
             type="button"
             onClick={openHistoryMode}
-            disabled={historyCount === 0}
+            disabled={reviewQuestionsCount === 0}
           >
-            Storico errori{historyCount > 0 ? ` (${historyCount})` : ''}
+            Domande da rivedere{reviewQuestionsCount > 0 ? ` (${reviewQuestionsCount})` : ''}
           </button>
         </div>
       )}
@@ -587,7 +637,7 @@ function TransferProgress({ fileInputRef, open, message, onToggle, onExport, onC
   );
 }
 
-function FinalScreen({ total, correctCount, wrongCount, mistakesCount, historyCount, onReview, onHistory }) {
+function FinalScreen({ total, correctCount, wrongCount, mistakesCount, reviewQuestionsCount, onReview, onHistory }) {
   const accuracy = getPercent(correctCount, correctCount + wrongCount);
 
   return (
@@ -600,7 +650,7 @@ function FinalScreen({ total, correctCount, wrongCount, mistakesCount, historyCo
         <div><span>Risposte sbagliate</span><strong>{wrongCount}</strong></div>
         <div><span>Correttezza</span><strong>{accuracy}%</strong></div>
         <div><span>Errori da ripassare</span><strong>{mistakesCount}</strong></div>
-        <div><span>Storico errori</span><strong>{historyCount}</strong></div>
+        <div><span>Domande da rivedere</span><strong>{reviewQuestionsCount}</strong></div>
       </div>
       <div className="final__actions">
         {mistakesCount > 0 && (
@@ -608,9 +658,9 @@ function FinalScreen({ total, correctCount, wrongCount, mistakesCount, historyCo
             Ripassa errori
           </button>
         )}
-        {historyCount > 0 && (
+        {reviewQuestionsCount > 0 && (
           <button className="button button--quiet" type="button" onClick={onHistory}>
-            Storico errori
+            Domande da rivedere
           </button>
         )}
       </div>
