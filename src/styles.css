@@ -161,11 +161,16 @@ button {
   margin-bottom: 16px;
 }
 
+.quiz-card__top > div:first-child {
+  min-width: 0;
+}
+
 .quiz-card__top-actions {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
+  flex: 0 0 auto;
 }
 
 .quiz-card h1 {
@@ -250,12 +255,14 @@ button {
     line-height: 1.32;
   }
 
-  .quiz-card__top {
-    flex-direction: column;
+  .quiz-card__top-actions {
+    gap: 6px;
   }
 
-  .quiz-card__top-actions {
-    justify-content: flex-start;
+  .button--mark {
+    min-height: 36px;
+    padding: 7px 9px;
+    font-size: 0.86rem;
   }
 
   .answers {
@@ -378,6 +385,7 @@ button {
   background: #ffffff;
   color: #475569;
   border-color: #d9e0e8;
+  white-space: nowrap;
 }
 
 .button--mark-active {
