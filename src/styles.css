@@ -93,7 +93,13 @@ button {
   transition: width 180ms ease;
 }
 
-.stats__grid,
+.stats__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 10px;
+}
+
 .final__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -109,6 +115,10 @@ button {
   background: #f3f6f9;
 }
 
+.stats__grid div {
+  padding: 8px 6px;
+}
+
 .stats span,
 .final span {
   display: block;
@@ -116,11 +126,21 @@ button {
   font-size: 0.8rem;
 }
 
+.stats span {
+  font-size: clamp(0.68rem, 2.9vw, 0.8rem);
+  line-height: 1.2;
+}
+
 .stats strong,
 .final strong {
   display: block;
   color: #172026;
   font-size: 1.2rem;
+}
+
+.stats strong {
+  font-size: clamp(1rem, 4.8vw, 1.2rem);
+  line-height: 1.2;
 }
 
 .quiz-card,
@@ -382,6 +402,20 @@ button {
 
   .stats__grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 14px;
+  }
+
+  .stats__grid div {
+    padding: 10px;
+  }
+
+  .stats span {
+    font-size: 0.8rem;
+  }
+
+  .stats strong {
+    font-size: 1.2rem;
   }
 
   .final__grid {

@@ -14,6 +14,7 @@ export default function QuizCard({
   onExitReview,
 }) {
   const correctLabel = question.correctAnswer || 'A';
+  const answerLetters = ['A', 'B', 'C'];
 
   function answerClass(answer) {
     if (!selectedAnswer) return 'answer';
@@ -50,7 +51,7 @@ export default function QuizCard({
               onClick={() => onSelectAnswer(answer)}
               disabled={Boolean(selectedAnswer)}
             >
-              <span className="answer__index">{index + 1}</span>
+              <span className="answer__index">{answerLetters[index] || String.fromCharCode(65 + index)}</span>
               <span>{answer.text || 'Risposta senza testo'}</span>
             </button>
           ))
