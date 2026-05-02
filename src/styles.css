@@ -368,6 +368,49 @@ button {
   width: 100%;
 }
 
+.transfer-progress {
+  margin-top: 16px;
+  border: 1px solid #d9e0e8;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.transfer-progress summary {
+  padding: 13px 14px;
+  color: #334155;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.transfer-progress__body {
+  display: grid;
+  gap: 12px;
+  padding: 0 14px 14px;
+  color: #475569;
+}
+
+.transfer-progress__body p {
+  margin: 0;
+}
+
+.transfer-progress__actions {
+  display: grid;
+  gap: 10px;
+}
+
+.transfer-progress__actions .button {
+  width: 100%;
+}
+
+.transfer-progress__file {
+  display: none;
+}
+
+.transfer-progress__message {
+  color: #1f625e;
+  font-weight: 700;
+}
+
 .reset-actions {
   display: grid;
   margin-top: 12px;
@@ -529,6 +572,10 @@ button {
     grid-template-columns: 1fr auto;
     display: grid;
     align-items: center;
+  }
+
+  .transfer-progress__actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .reset-actions {

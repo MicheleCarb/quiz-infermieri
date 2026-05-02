@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import QuizCard from './components/QuizCard.jsx';
 import StatsBar from './components/StatsBar.jsx';
 import ReviewMistakesButton from './components/ReviewMistakesButton.jsx';
@@ -9,6 +9,9 @@ import { buildQuestionMap, createInitialProgress, getPercent, sanitizeProgress }
 import { getRandomMonkeyGif, loadMonkeyGifs } from './utils/monkeyGifs';
 
 const QUESTIONS_URL = `${import.meta.env.BASE_URL}data/questions.json`;
+const EXPORT_APP_ID = 'quiz-kikka';
+const EXPORT_SCHEMA_VERSION = 1;
+const QUIZ_ID = 'asl-bari-infermieri';
 
 export default function App() {
   const [status, setStatus] = useState('loading');
@@ -26,6 +29,9 @@ export default function App() {
   const [reviewIndex, setReviewIndex] = useState(0);
   const [reviewAttempt, setReviewAttempt] = useState(0);
   const [historyMode, setHistoryMode] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [transferMessage, setTransferMessage] = useState('');
+  const fileInputRef = useRef(null);
 
   const questionMap = useMemo(() => buildQuestionMap(questions), [questions]);
   const total = questions.length;
@@ -135,6 +141,7 @@ export default function App() {
   function handleSelectAnswer(answer) {
     if (!currentQuestion || selectedAnswer) return;
 
+    closeTransferProgress();
     const selectedLabel = answer.label;
     const correctLabel = currentQuestion.correctAnswer || 'A';
     const isCorrect = selectedLabel === correctLabel;
@@ -188,6 +195,8 @@ export default function App() {
   }
 
   function handleNext() {
+    closeTransferProgress();
+
     if (reviewMode) {
       const remainingReviewIds = reviewOrder.filter((id) => progress?.mistakes[id]);
       const nextIndex = reviewIndex + 1;
@@ -212,6 +221,7 @@ export default function App() {
     const ids = Object.keys(progress?.mistakes || {});
     if (ids.length === 0) return;
 
+    closeTransferProgress();
     setReviewOrder(shuffle(ids));
     setReviewIndex(0);
     setReviewAttempt(0);
@@ -226,6 +236,7 @@ export default function App() {
   }
 
   function resetQuiz() {
+    closeTransferProgress();
     const confirmed = window.confirm('Vuoi cancellare i progressi e ricominciare da capo?');
     if (!confirmed) return;
 
@@ -235,6 +246,176 @@ export default function App() {
     saveProgress(freshProgress);
     setHistoryMode(false);
     exitReviewMode();
+  }
+
+  function openHistoryMode() {
+    closeTransferProgress();
+    setHistoryMode(true);
+  }
+
+  function closeTransferProgress() {
+    setTransferOpen(false);
+  }
+
+  async function getQuestionsHash() {
+    if (!window.crypto?.subtle) return null;
+
+    const serialized = JSON.stringify(questions);
+    const data = new TextEncoder().encode(serialized);
+    const digest = await window.crypto.subtle.digest('SHA-256', data);
+
+    return [...new Uint8Array(digest)]
+      .map((byte) => byte.toString(16).padStart(2, '0'))
+      .join('');
+  }
+
+  async function handleExportProgress() {
+    if (!progress) return;
+
+    const exportData = {
+      app: EXPORT_APP_ID,
+      schemaVersion: EXPORT_SCHEMA_VERSION,
+      quizId: QUIZ_ID,
+      source: metadata?.source || 'Quiz infermieristica',
+      totalQuestions: metadata?.totalQuestions || total,
+      questionsHash: await getQuestionsHash(),
+      exportedAt: new Date().toISOString(),
+      progress,
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+
+    link.href = url;
+    link.download = `quiz-kikka-progressi-${QUIZ_ID}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    setTransferMessage('Progressi scaricati.');
+  }
+
+  function handleChooseImportFile() {
+    fileInputRef.current?.click();
+  }
+
+  async function handleImportFile(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    try {
+      const parsed = JSON.parse(await file.text());
+      const validation = await validateProgressExport(parsed);
+
+      if (!validation.ok) {
+        setTransferMessage(validation.message);
+        return;
+      }
+
+      const confirmed = window.confirm('Caricare questi progressi sostituirà quelli attuali. Vuoi continuare?');
+      if (!confirmed) return;
+
+      saveProgress(validation.progress);
+      setProgress(validation.progress);
+      setSelectedAnswer(null);
+      setResult(null);
+      setFeedbackGif(null);
+      setHistoryMode(false);
+      exitReviewMode();
+      closeTransferProgress();
+      setTransferMessage('Progressi caricati! Puoi continuare da dove eri.');
+    } catch (error) {
+      setTransferMessage('Questo file non sembra un salvataggio valido dei quiz.');
+    }
+  }
+
+  async function validateProgressExport(parsed) {
+    if (!parsed || typeof parsed !== 'object') {
+      return invalidSave();
+    }
+
+    if (parsed.app !== EXPORT_APP_ID || parsed.schemaVersion !== EXPORT_SCHEMA_VERSION) {
+      return invalidSave();
+    }
+
+    if (parsed.quizId !== QUIZ_ID) {
+      return { ok: false, message: 'Questo salvataggio appartiene a un altro quiz.' };
+    }
+
+    if (
+      typeof parsed.totalQuestions === 'number'
+      && parsed.totalQuestions !== total
+    ) {
+      return { ok: false, message: 'Questo salvataggio non è compatibile con questa banca dati.' };
+    }
+
+    if (parsed.questionsHash) {
+      const currentHash = await getQuestionsHash();
+      if (currentHash && parsed.questionsHash !== currentHash) {
+        return { ok: false, message: 'Questo salvataggio non è compatibile con questa banca dati.' };
+      }
+    }
+
+    if (!isProgressShapeValid(parsed.progress)) {
+      return invalidSave();
+    }
+
+    if (parsed.progress.questionOrder.length !== total) {
+      return { ok: false, message: 'Questo salvataggio non è compatibile con questa banca dati.' };
+    }
+
+    const importedProgress = {
+      ...parsed.progress,
+      questionOrder: parsed.progress.questionOrder.map(String),
+      answeredIds: parsed.progress.answeredIds.map(String),
+      mistakes: parsed.progress.mistakes || {},
+      mistakeHistory: parsed.progress.mistakeHistory || {},
+    };
+    const sanitized = sanitizeProgress(importedProgress, questionMap, questions);
+
+    if (sanitized.questionOrder.length !== total) {
+      return { ok: false, message: 'Questo salvataggio non è compatibile con questa banca dati.' };
+    }
+
+    return { ok: true, progress: sanitized };
+  }
+
+  function isProgressShapeValid(importedProgress) {
+    if (!importedProgress || typeof importedProgress !== 'object') return false;
+    if (!Array.isArray(importedProgress.questionOrder)) return false;
+    if (!Array.isArray(importedProgress.answeredIds)) return false;
+    if (typeof importedProgress.currentIndex !== 'number') return false;
+    if (importedProgress.currentIndex < 0 || importedProgress.currentIndex > total) return false;
+    if (typeof importedProgress.correctCount !== 'number') return false;
+    if (typeof importedProgress.wrongCount !== 'number') return false;
+    if (!isPlainObject(importedProgress.mistakes)) return false;
+    if (
+      importedProgress.mistakeHistory !== undefined
+      && !isPlainObject(importedProgress.mistakeHistory)
+    ) return false;
+
+    const seen = new Set();
+    for (const id of importedProgress.questionOrder) {
+      const normalizedId = String(id);
+      if (!questionMap.has(normalizedId) || seen.has(normalizedId)) return false;
+      seen.add(normalizedId);
+    }
+
+    for (const id of importedProgress.answeredIds) {
+      if (!questionMap.has(String(id))) return false;
+    }
+
+    return true;
+  }
+
+  function isPlainObject(value) {
+    return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+  }
+
+  function invalidSave() {
+    return { ok: false, message: 'Questo file non sembra un salvataggio valido dei quiz.' };
   }
 
   if (status === 'loading') {
@@ -297,7 +478,7 @@ export default function App() {
           mistakesCount={mistakesCount}
           historyCount={historyCount}
           onReview={startReviewMode}
-          onHistory={() => setHistoryMode(true)}
+          onHistory={openHistoryMode}
         />
       ) : isReviewFinished || (reviewMode && reviewOrder.length === 0) ? (
         <section className="panel panel--message">
@@ -339,13 +520,22 @@ export default function App() {
           <button
             className="button button--quiet"
             type="button"
-            onClick={() => setHistoryMode(true)}
+            onClick={openHistoryMode}
             disabled={historyCount === 0}
           >
             Storico errori{historyCount > 0 ? ` (${historyCount})` : ''}
           </button>
         </div>
       )}
+      <TransferProgress
+        fileInputRef={fileInputRef}
+        open={transferOpen}
+        message={transferMessage}
+        onToggle={setTransferOpen}
+        onExport={handleExportProgress}
+        onChooseImportFile={handleChooseImportFile}
+        onImportFile={handleImportFile}
+      />
       {hasProgress && !reviewMode && !historyMode && !isFinished && currentQuestion && (
         <div className="reset-actions">
           <button className="button button--danger button--danger-soft" type="button" onClick={resetQuiz}>
@@ -366,6 +556,33 @@ export default function App() {
 
 function Shell({ children, stickyNext = false }) {
   return <div className={`app-shell${stickyNext ? ' app-shell--sticky-next' : ''}`}>{children}</div>;
+}
+
+function TransferProgress({ fileInputRef, open, message, onToggle, onExport, onChooseImportFile, onImportFile }) {
+  return (
+    <details className="transfer-progress" open={open} onToggle={(event) => onToggle(event.currentTarget.open)}>
+      <summary>Trasferisci progressi</summary>
+      <div className="transfer-progress__body">
+        <p>Vuoi continuare su un altro dispositivo? Scarica un file con i progressi e caricalo sull’altro dispositivo.</p>
+        <div className="transfer-progress__actions">
+          <button className="button button--secondary" type="button" onClick={onExport}>
+            Scarica progressi
+          </button>
+          <button className="button button--quiet" type="button" onClick={onChooseImportFile}>
+            Carica da file
+          </button>
+        </div>
+        <input
+          ref={fileInputRef}
+          className="transfer-progress__file"
+          type="file"
+          accept="application/json,.json"
+          onChange={onImportFile}
+        />
+        {message && <p className="transfer-progress__message" role="status">{message}</p>}
+      </div>
+    </details>
+  );
 }
 
 function FinalScreen({ total, correctCount, wrongCount, mistakesCount, historyCount, onReview, onHistory }) {
