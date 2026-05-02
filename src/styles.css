@@ -58,7 +58,8 @@ button {
 
 .source,
 .eyebrow,
-.question-id {
+.question-id,
+.question-context {
   margin: 0;
   color: #64748b;
   font-size: 0.88rem;
@@ -82,6 +83,109 @@ button {
 .stats {
   padding: 14px;
   margin-bottom: 16px;
+}
+
+.study-selector {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 0;
+  border: 1px solid #d9e0e8;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 16px 40px rgba(17, 24, 39, 0.08);
+  overflow: hidden;
+}
+
+.study-selector__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 58px;
+  padding: 11px 14px;
+  border: 0;
+  background: #ffffff;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.study-selector__summary-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.study-selector__current {
+  margin: 0;
+  color: #475569;
+  line-height: 1.25;
+}
+
+.study-selector__toggle {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 7px 10px;
+  border: 1px solid #d9e0e8;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #334155;
+  font-weight: 800;
+}
+
+.study-selector__panel {
+  display: grid;
+  gap: 12px;
+  padding: 0 14px 14px;
+}
+
+.study-selector__modes {
+  display: grid;
+  gap: 8px;
+}
+
+.study-selector__mode,
+.study-selector__block {
+  min-height: 42px;
+  padding: 9px 11px;
+  border: 1px solid #d9e0e8;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #475569;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.study-selector__mode--active,
+.study-selector__block--active {
+  border-color: #b8d5d2;
+  background: #eef6f5;
+  color: #1f625e;
+}
+
+.study-selector__blocks {
+  display: grid;
+  gap: 8px;
+}
+
+.study-selector__block {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  text-align: left;
+}
+
+.study-selector__block strong {
+  flex: 0 0 auto;
+}
+
+.study-selector__note {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.84rem;
 }
 
 .progress {
@@ -248,6 +352,17 @@ button {
 @media (max-width: 480px) {
   .quiz-card {
     padding: 16px 14px;
+  }
+
+  .study-selector__summary {
+    min-height: 54px;
+    padding: 10px 12px;
+  }
+
+  .study-selector__toggle {
+    min-height: 34px;
+    padding: 6px 9px;
+    font-size: 0.86rem;
   }
 
   .quiz-card h1 {
@@ -638,6 +753,20 @@ button {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 10px;
     margin-top: 14px;
+  }
+
+  .study-selector__modes {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .study-selector__summary-text {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: baseline;
+    gap: 14px;
+  }
+
+  .study-selector__blocks {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .stats__grid div {

@@ -4,21 +4,30 @@ import StatsBar from './components/StatsBar.jsx';
 import ReviewMistakesButton from './components/ReviewMistakesButton.jsx';
 import MistakeHistory from './components/MistakeHistory.jsx';
 import { shuffle } from './utils/shuffle';
-import { clearProgress, loadProgress, saveProgress } from './utils/storage';
-import { buildQuestionMap, createInitialProgress, getPercent, sanitizeProgress } from './utils/quizEngine';
+import { loadProgress, saveProgress } from './utils/storage';
+import {
+  buildQuestionMap,
+  createInitialProgressForIds,
+  ensureBlockStudySets,
+  getPercent,
+  sanitizeProgress,
+  sanitizeStudyState,
+} from './utils/quizEngine';
 import { getRandomMonkeyGif, loadMonkeyGifs } from './utils/monkeyGifs';
 
 const QUESTIONS_URL = `${import.meta.env.BASE_URL}data/questions.json`;
 const EXPORT_APP_ID = 'quiz-kikka';
-const EXPORT_SCHEMA_VERSION = 1;
+const EXPORT_SCHEMA_VERSION = 2;
+const LEGACY_EXPORT_SCHEMA_VERSION = 1;
 const QUIZ_ID = 'asl-bari-infermieri';
+const BLOCK_SIZES = [500, 1000];
 
 export default function App() {
   const [status, setStatus] = useState('loading');
   const [loadError, setLoadError] = useState('');
   const [questions, setQuestions] = useState([]);
   const [metadata, setMetadata] = useState(null);
-  const [progress, setProgress] = useState(null);
+  const [studyState, setStudyState] = useState(null);
   const [answers, setAnswers] = useState([]);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [result, setResult] = useState(null);
@@ -35,6 +44,15 @@ export default function App() {
 
   const questionMap = useMemo(() => buildQuestionMap(questions), [questions]);
   const total = questions.length;
+  const activeStudySet = studyState?.studySets?.[studyState.activeStudySetId] || null;
+  const progress = activeStudySet ? studyState?.progressByStudySetId?.[activeStudySet.id] : null;
+  const activeTotal = activeStudySet?.type === 'block'
+    ? activeStudySet.questionIds.length
+    : total;
+  const activeStudyLabel = activeStudySet?.type === 'block'
+    ? `${activeStudySet.label} - Domande ${activeStudySet.rangeLabel}`
+    : '';
+  const selectedBlockSize = activeStudySet?.type === 'block' ? activeStudySet.blockSize : null;
   const mistakesCount = progress ? Object.keys(progress.mistakes).length : 0;
   const markedForReviewIds = progress?.markedForReviewIds || [];
   const historyItems = useMemo(
@@ -46,7 +64,7 @@ export default function App() {
   const reviewQuestionsCount = progress
     ? new Set([...Object.keys(progress.mistakeHistory || {}), ...markedForReviewIds]).size
     : 0;
-  const completedCount = progress ? Math.min(progress.answeredIds.length, total) : 0;
+  const completedCount = progress ? Math.min(progress.answeredIds.length, activeTotal) : 0;
   const hasProgress = progress
     ? completedCount > 0
       || progress.correctCount > 0
@@ -98,8 +116,8 @@ export default function App() {
         }
 
         const map = buildQuestionMap(loadedQuestions);
-        const restored = sanitizeProgress(loadProgress(), map, loadedQuestions);
-        setProgress(restored);
+        const restored = sanitizeStudyState(loadProgress(), map, loadedQuestions);
+        setStudyState(restored);
         saveProgress(restored);
         setStatus('ready');
       } catch (error) {
@@ -145,8 +163,24 @@ export default function App() {
   }, [currentQuestionId, currentQuestion, reviewAttempt]);
 
   useEffect(() => {
-    if (progress) saveProgress(progress);
-  }, [progress]);
+    if (studyState) saveProgress(studyState);
+  }, [studyState]);
+
+  function updateActiveProgress(updater) {
+    setStudyState((previous) => {
+      const activeId = previous.activeStudySetId;
+      const currentProgress = previous.progressByStudySetId[activeId];
+      const nextProgress = updater(currentProgress);
+
+      return {
+        ...previous,
+        progressByStudySetId: {
+          ...previous.progressByStudySetId,
+          [activeId]: nextProgress,
+        },
+      };
+    });
+  }
 
   function handleSelectAnswer(answer) {
     if (!currentQuestion || selectedAnswer) return;
@@ -162,7 +196,7 @@ export default function App() {
     setResult(nextResult);
     setFeedbackGif(getRandomMonkeyGif(nextResult, monkeyGifs));
 
-    setProgress((previous) => {
+    updateActiveProgress((previous) => {
       const next = {
         ...previous,
         mistakes: { ...previous.mistakes },
@@ -210,7 +244,7 @@ export default function App() {
     closeTransferProgress();
     const questionId = String(currentQuestionId);
 
-    setProgress((previous) => {
+    updateActiveProgress((previous) => {
       const markedIds = new Set(previous.markedForReviewIds || []);
 
       if (markedIds.has(questionId)) {
@@ -227,7 +261,7 @@ export default function App() {
   }
 
   function handleUnmarkForReview(questionId) {
-    setProgress((previous) => ({
+    updateActiveProgress((previous) => ({
       ...previous,
       markedForReviewIds: (previous.markedForReviewIds || []).filter((id) => String(id) !== String(questionId)),
     }));
@@ -250,7 +284,7 @@ export default function App() {
       return;
     }
 
-    setProgress((previous) => ({
+    updateActiveProgress((previous) => ({
       ...previous,
       currentIndex: Math.min(previous.currentIndex + 1, previous.questionOrder.length),
     }));
@@ -274,17 +308,85 @@ export default function App() {
     setReviewAttempt(0);
   }
 
-  function resetQuiz() {
-    closeTransferProgress();
-    const confirmed = window.confirm('Vuoi cancellare i progressi e ricominciare da capo?');
-    if (!confirmed) return;
+  function prepareForStudySetChange() {
+    if (selectedAnswer) {
+      const confirmed = window.confirm('Vuoi passare a questo blocco? Potrai tornare ai progressi attuali in qualsiasi momento.');
+      if (!confirmed) return false;
+    }
 
-    clearProgress();
-    const freshProgress = createInitialProgress(questions);
-    setProgress(freshProgress);
-    saveProgress(freshProgress);
+    closeTransferProgress();
+    setSelectedAnswer(null);
+    setResult(null);
+    setFeedbackGif(null);
     setHistoryMode(false);
     exitReviewMode();
+    return true;
+  }
+
+  function handleChooseAllQuestions() {
+    if (studyState?.activeStudySetId === 'all') return;
+    if (!prepareForStudySetChange()) return;
+
+    setStudyState((previous) => ({
+      ...previous,
+      activeStudySetId: 'all',
+    }));
+  }
+
+  function handlePrepareBlocks(blockSize) {
+    setStudyState((previous) => ensureBlockStudySets(previous, questions, blockSize));
+  }
+
+  function handleChooseStudySet(studySetId) {
+    if (!studyState?.studySets?.[studySetId]) return;
+    if (studyState.activeStudySetId === studySetId) return;
+    if (!prepareForStudySetChange()) return;
+
+    setStudyState((previous) => {
+      const studySet = previous.studySets[studySetId];
+      const existingProgress = previous.progressByStudySetId[studySetId];
+      const nextProgress = existingProgress || createInitialProgressForIds(
+        studySet.type === 'block' ? studySet.questionIds : questions.map((question, index) => String(question.id || question.number || index))
+      );
+
+      return {
+        ...previous,
+        activeStudySetId: studySetId,
+        progressByStudySetId: {
+          ...previous.progressByStudySetId,
+          [studySetId]: nextProgress,
+        },
+      };
+    });
+  }
+
+  function resetActiveProgress() {
+    const questionIds = activeStudySet?.type === 'block'
+      ? activeStudySet.questionIds
+      : questions.map((question, index) => String(question.id || question.number || index));
+
+    updateActiveProgress(() => createInitialProgressForIds(questionIds));
+    setSelectedAnswer(null);
+    setResult(null);
+    setFeedbackGif(null);
+    setHistoryMode(false);
+    exitReviewMode();
+  }
+
+  function repeatActiveBlock() {
+    if (activeStudySet?.type !== 'block') return;
+    resetActiveProgress();
+  }
+
+  function resetQuiz() {
+    closeTransferProgress();
+    const message = activeStudySet?.type === 'block'
+      ? `Vuoi ricominciare ${activeStudySet.label} da capo?`
+      : 'Vuoi ricominciare tutte le domande da capo?';
+    const confirmed = window.confirm(message);
+    if (!confirmed) return;
+
+    resetActiveProgress();
   }
 
   function openHistoryMode() {
@@ -309,7 +411,7 @@ export default function App() {
   }
 
   async function handleExportProgress() {
-    if (!progress) return;
+    if (!studyState) return;
 
     const exportData = {
       app: EXPORT_APP_ID,
@@ -319,7 +421,10 @@ export default function App() {
       totalQuestions: metadata?.totalQuestions || total,
       questionsHash: await getQuestionsHash(),
       exportedAt: new Date().toISOString(),
-      progress,
+      activeStudySetId: studyState.activeStudySetId,
+      studySets: studyState.studySets,
+      progressByStudySetId: studyState.progressByStudySetId,
+      progress: studyState.progressByStudySetId.all,
     };
 
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
@@ -356,8 +461,9 @@ export default function App() {
       const confirmed = window.confirm('Caricare questi progressi sostituirà quelli attuali. Vuoi continuare?');
       if (!confirmed) return;
 
-      saveProgress(validation.progress);
-      setProgress(validation.progress);
+      const importedStudyState = validation.studyState || sanitizeStudyState(validation.progress, questionMap, questions);
+      saveProgress(importedStudyState);
+      setStudyState(importedStudyState);
       setSelectedAnswer(null);
       setResult(null);
       setFeedbackGif(null);
@@ -375,7 +481,10 @@ export default function App() {
       return invalidSave();
     }
 
-    if (parsed.app !== EXPORT_APP_ID || parsed.schemaVersion !== EXPORT_SCHEMA_VERSION) {
+    if (
+      parsed.app !== EXPORT_APP_ID
+      || ![LEGACY_EXPORT_SCHEMA_VERSION, EXPORT_SCHEMA_VERSION].includes(parsed.schemaVersion)
+    ) {
       return invalidSave();
     }
 
@@ -395,6 +504,21 @@ export default function App() {
       if (currentHash && parsed.questionsHash !== currentHash) {
         return { ok: false, message: 'Questo salvataggio non è compatibile con questa banca dati.' };
       }
+    }
+
+    if (parsed.schemaVersion === EXPORT_SCHEMA_VERSION && parsed.studySets && parsed.progressByStudySetId) {
+      const sanitized = sanitizeStudyState({
+        version: 2,
+        activeStudySetId: parsed.activeStudySetId || 'all',
+        studySets: parsed.studySets,
+        progressByStudySetId: parsed.progressByStudySetId,
+      }, questionMap, questions);
+
+      if (!sanitized.progressByStudySetId.all || sanitized.progressByStudySetId.all.questionOrder.length !== total) {
+        return { ok: false, message: 'Questo salvataggio non e compatibile con questa banca dati.' };
+      }
+
+      return { ok: true, studyState: sanitized };
     }
 
     if (!isProgressShapeValid(parsed.progress)) {
@@ -503,9 +627,20 @@ export default function App() {
         </div>
       </header>
 
+      <StudySelector
+        studyState={studyState}
+        activeStudySet={activeStudySet}
+        selectedBlockSize={selectedBlockSize}
+        blockSizes={BLOCK_SIZES}
+        total={total}
+        onChooseAll={handleChooseAllQuestions}
+        onPrepareBlocks={handlePrepareBlocks}
+        onChooseStudySet={handleChooseStudySet}
+      />
+
       <StatsBar
         completed={completedCount}
-        total={total}
+        total={activeTotal}
         correctCount={progress.correctCount}
         wrongCount={progress.wrongCount}
       />
@@ -520,13 +655,16 @@ export default function App() {
         />
       ) : isFinished ? (
         <FinalScreen
-          total={total}
+          total={activeTotal}
+          activeStudySet={activeStudySet}
           correctCount={progress.correctCount}
           wrongCount={progress.wrongCount}
           mistakesCount={mistakesCount}
           reviewQuestionsCount={reviewQuestionsCount}
           onReview={startReviewMode}
           onHistory={openHistoryMode}
+          onRepeatBlock={repeatActiveBlock}
+          onChooseAll={handleChooseAllQuestions}
         />
       ) : isReviewFinished || (reviewMode && reviewOrder.length === 0) ? (
         <section className="panel panel--message">
@@ -539,8 +677,9 @@ export default function App() {
       ) : currentQuestion ? (
         <QuizCard
           question={currentQuestion}
-          displayIndex={Math.min(progress.currentIndex + 1, total)}
-          total={total}
+          displayIndex={Math.min(progress.currentIndex + 1, activeTotal)}
+          total={activeTotal}
+          contextLabel={activeStudyLabel}
           answers={answers}
           selectedAnswer={selectedAnswer}
           result={result}
@@ -610,6 +749,115 @@ function Shell({ children, stickyNext = false }) {
   return <div className={`app-shell${stickyNext ? ' app-shell--sticky-next' : ''}`}>{children}</div>;
 }
 
+function StudySelector({
+  studyState,
+  activeStudySet,
+  selectedBlockSize,
+  blockSizes,
+  total,
+  onChooseAll,
+  onPrepareBlocks,
+  onChooseStudySet,
+}) {
+  const [selectedMode, setSelectedMode] = useState(selectedBlockSize || 'all');
+  const [isOpen, setIsOpen] = useState(false);
+  const panelId = 'study-selector-panel';
+
+  useEffect(() => {
+    setSelectedMode(selectedBlockSize || 'all');
+  }, [selectedBlockSize]);
+
+  const activeLabel = activeStudySet?.type === 'block'
+    ? `${activeStudySet.label} - ${activeStudySet.rangeLabel}`
+    : 'Tutte le domande';
+  const blockSets = Object.values(studyState.studySets || {})
+    .filter((set) => set.type === 'block' && set.blockSize === selectedMode)
+    .sort((a, b) => a.blockIndex - b.blockIndex);
+
+  function chooseMode(mode) {
+    setSelectedMode(mode);
+    if (mode === 'all') {
+      onChooseAll();
+    } else {
+      onPrepareBlocks(mode);
+    }
+    setIsOpen(false);
+  }
+
+  function chooseStudySet(studySetId) {
+    onChooseStudySet(studySetId);
+    setIsOpen(false);
+  }
+
+  return (
+    <section className="study-selector">
+      <button
+        className="study-selector__summary"
+        type="button"
+        aria-expanded={isOpen}
+        aria-controls={panelId}
+        onClick={() => setIsOpen((open) => !open)}
+      >
+        <span className="study-selector__summary-text">
+          <span className="eyebrow">Scegli cosa studiare</span>
+          <span className="study-selector__current">Stai studiando: <strong>{activeLabel}</strong></span>
+        </span>
+        <span className="study-selector__toggle">{isOpen ? 'Chiudi' : 'Cambia'}</span>
+      </button>
+
+      {isOpen && (
+        <div className="study-selector__panel" id={panelId}>
+          <div className="study-selector__modes" aria-label="Scegli cosa studiare">
+            <button
+              className={`study-selector__mode${selectedMode === 'all' ? ' study-selector__mode--active' : ''}`}
+              type="button"
+              onClick={() => chooseMode('all')}
+            >
+              Tutte le domande
+            </button>
+            {blockSizes.map((blockSize) => (
+              <button
+                className={`study-selector__mode${selectedMode === blockSize ? ' study-selector__mode--active' : ''}`}
+                type="button"
+                key={blockSize}
+                onClick={() => chooseMode(blockSize)}
+              >
+                Blocchi da {blockSize}
+              </button>
+            ))}
+          </div>
+
+          {selectedMode !== 'all' && (
+            <div className="study-selector__blocks">
+              {blockSets.length === 0 ? (
+                <p className="empty-state">Preparazione blocchi...</p>
+              ) : (
+                blockSets.map((studySet) => {
+                  const blockProgress = studyState.progressByStudySetId[studySet.id];
+                  const completed = blockProgress ? Math.min(blockProgress.answeredIds.length, studySet.questionIds.length) : 0;
+                  const isActive = activeStudySet?.id === studySet.id;
+
+                  return (
+                    <button
+                      className={`study-selector__block${isActive ? ' study-selector__block--active' : ''}`}
+                      type="button"
+                      key={studySet.id}
+                      onClick={() => chooseStudySet(studySet.id)}
+                    >
+                      <span>{studySet.label}: {studySet.rangeLabel}</span>
+                      <strong>{completed} / {studySet.questionIds.length}</strong>
+                    </button>
+                  );
+                })
+              )}
+              <p className="study-selector__note">Totale banca dati: {total} domande</p>
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
 function TransferProgress({ fileInputRef, open, message, onToggle, onExport, onChooseImportFile, onImportFile }) {
   return (
     <details className="transfer-progress" open={open} onToggle={(event) => onToggle(event.currentTarget.open)}>
@@ -637,13 +885,25 @@ function TransferProgress({ fileInputRef, open, message, onToggle, onExport, onC
   );
 }
 
-function FinalScreen({ total, correctCount, wrongCount, mistakesCount, reviewQuestionsCount, onReview, onHistory }) {
+function FinalScreen({
+  total,
+  activeStudySet,
+  correctCount,
+  wrongCount,
+  mistakesCount,
+  reviewQuestionsCount,
+  onReview,
+  onHistory,
+  onRepeatBlock,
+  onChooseAll,
+}) {
   const accuracy = getPercent(correctCount, correctCount + wrongCount);
+  const isBlock = activeStudySet?.type === 'block';
 
   return (
     <section className="panel final">
       <p className="eyebrow">Sessione completata</p>
-      <h1>Hai completato tutte le domande</h1>
+      <h1>{isBlock ? `Hai completato ${activeStudySet.label}` : 'Hai completato tutte le domande'}</h1>
       <div className="final__grid">
         <div><span>Totale domande</span><strong>{total}</strong></div>
         <div><span>Risposte corrette</span><strong>{correctCount}</strong></div>
@@ -662,6 +922,16 @@ function FinalScreen({ total, correctCount, wrongCount, mistakesCount, reviewQue
           <button className="button button--quiet" type="button" onClick={onHistory}>
             Domande da rivedere
           </button>
+        )}
+        {isBlock && (
+          <>
+            <button className="button button--primary" type="button" onClick={onRepeatBlock}>
+              Ripeti questo blocco
+            </button>
+            <button className="button button--quiet" type="button" onClick={onChooseAll}>
+              Torna a tutte le domande
+            </button>
+          </>
         )}
       </div>
     </section>

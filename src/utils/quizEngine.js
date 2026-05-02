@@ -17,11 +17,33 @@ export function buildQuestionMap(questions) {
   return map;
 }
 
-export function createInitialProgress(questions) {
-  const ids = questions.map((question, index) => String(question.id || question.number || index));
+export function getQuestionId(question, index) {
+  return String(question.id || question.number || index);
+}
 
+export function getOrderedQuestionIds(questions) {
+  return questions
+    .map((question, index) => ({
+      id: getQuestionId(question, index),
+      order: typeof question.number === 'number' ? question.number : index + 1,
+      index,
+    }))
+    .sort((a, b) => {
+      if (a.order !== b.order) return a.order - b.order;
+      return a.index - b.index;
+    })
+    .map((item) => item.id);
+}
+
+export function createInitialProgress(questions) {
+  const ids = questions.map((question, index) => getQuestionId(question, index));
+
+  return createInitialProgressForIds(ids);
+}
+
+export function createInitialProgressForIds(questionIds) {
   return {
-    questionOrder: shuffle(ids),
+    questionOrder: shuffle(questionIds.map(String)),
     currentIndex: 0,
     correctCount: 0,
     wrongCount: 0,
@@ -32,23 +54,100 @@ export function createInitialProgress(questions) {
   };
 }
 
-export function sanitizeProgress(progress, questionMap, questions) {
-  if (!progress) return createInitialProgress(questions);
+export function createInitialStudyState(questions) {
+  return {
+    version: 2,
+    activeStudySetId: 'all',
+    studySets: {
+      all: createAllStudySet(),
+    },
+    progressByStudySetId: {
+      all: createInitialProgress(questions),
+    },
+  };
+}
 
-  const usableOrder = progress.questionOrder.filter((id) => questionMap.has(String(id))).map(String);
+export function createAllStudySet() {
+  return {
+    id: 'all',
+    type: 'all',
+    label: 'Tutte le domande',
+  };
+}
+
+export function createBlockStudySets(questions, blockSize) {
+  const orderedIds = getOrderedQuestionIds(questions);
+  const sets = {};
+
+  for (let start = 0; start < orderedIds.length; start += blockSize) {
+    const blockIndex = Math.floor(start / blockSize);
+    const questionIds = orderedIds.slice(start, start + blockSize);
+    const id = getBlockStudySetId(blockSize, blockIndex);
+    const end = start + questionIds.length;
+
+    sets[id] = {
+      id,
+      type: 'block',
+      blockSize,
+      blockIndex,
+      label: `Blocco ${blockIndex + 1}`,
+      rangeLabel: `${start + 1}-${end}`,
+      questionIds,
+    };
+  }
+
+  return sets;
+}
+
+export function getBlockStudySetId(blockSize, blockIndex) {
+  return `block-${blockSize}-${blockIndex}`;
+}
+
+export function ensureBlockStudySets(studyState, questions, blockSize) {
+  const existingSets = studyState.studySets || {};
+  const alreadyInitialized = Object.values(existingSets).some((set) => (
+    set?.type === 'block' && set.blockSize === blockSize && Array.isArray(set.questionIds)
+  ));
+
+  if (alreadyInitialized) return studyState;
+
+  return {
+    ...studyState,
+    studySets: {
+      ...existingSets,
+      ...createBlockStudySets(questions, blockSize),
+    },
+  };
+}
+
+export function sanitizeProgress(progress, questionMap, questions, allowedQuestionIds = null) {
+  const fallbackIds = allowedQuestionIds
+    ? allowedQuestionIds.map(String).filter((id) => questionMap.has(id))
+    : questions.map((question, index) => getQuestionId(question, index));
+
+  if (!progress) return createInitialProgressForIds(fallbackIds);
+
+  const allowedSet = new Set(fallbackIds);
+  const sourceOrder = Array.isArray(progress.questionOrder) ? progress.questionOrder : [];
+  const usableOrder = sourceOrder
+    .filter((id) => questionMap.has(String(id)) && allowedSet.has(String(id)))
+    .map(String);
+
   const knownIds = new Set(usableOrder);
 
-  questions.forEach((question, index) => {
-    const id = String(question.id || question.number || index);
+  fallbackIds.forEach((id) => {
     if (!knownIds.has(id)) {
       usableOrder.push(id);
       knownIds.add(id);
     }
   });
 
-  const answeredIds = progress.answeredIds.filter((id) => questionMap.has(String(id))).map(String);
+  const answeredSource = Array.isArray(progress.answeredIds) ? progress.answeredIds : [];
+  const answeredIds = answeredSource
+    .filter((id) => questionMap.has(String(id)) && allowedSet.has(String(id)))
+    .map(String);
   const answeredSet = new Set(answeredIds);
-  let currentIndex = Math.min(Math.max(progress.currentIndex, 0), usableOrder.length);
+  let currentIndex = Math.min(Math.max(progress.currentIndex || 0, 0), usableOrder.length);
 
   while (currentIndex < usableOrder.length && answeredSet.has(usableOrder[currentIndex])) {
     currentIndex += 1;
@@ -57,12 +156,13 @@ export function sanitizeProgress(progress, questionMap, questions) {
   const mistakes = {};
   const mistakeHistory = {};
   const markedForReviewIds = Array.isArray(progress.markedForReviewIds)
-    ? [...new Set(progress.markedForReviewIds.map(String))].filter((id) => questionMap.has(id))
+    ? [...new Set(progress.markedForReviewIds.map(String))]
+      .filter((id) => questionMap.has(id) && allowedSet.has(id))
     : [];
 
   Object.entries(progress.mistakes || {}).forEach(([id, mistake]) => {
     const normalizedId = String(id);
-    if (questionMap.has(normalizedId)) {
+    if (questionMap.has(normalizedId) && allowedSet.has(normalizedId)) {
       mistakes[normalizedId] = mistake;
     } else {
       console.warn('Domanda salvata nei progressi ma non trovata nel JSON:', normalizedId);
@@ -71,7 +171,7 @@ export function sanitizeProgress(progress, questionMap, questions) {
 
   Object.entries(progress.mistakeHistory || {}).forEach(([id, mistake]) => {
     const normalizedId = String(id);
-    if (questionMap.has(normalizedId)) {
+    if (questionMap.has(normalizedId) && allowedSet.has(normalizedId)) {
       mistakeHistory[normalizedId] = mistake;
     }
   });
@@ -87,10 +187,89 @@ export function sanitizeProgress(progress, questionMap, questions) {
     questionOrder: usableOrder,
     currentIndex,
     answeredIds,
+    correctCount: progress.correctCount || 0,
+    wrongCount: progress.wrongCount || 0,
     mistakes,
     mistakeHistory,
     markedForReviewIds,
   };
+}
+
+export function sanitizeStudyState(savedState, questionMap, questions) {
+  if (!savedState) return createInitialStudyState(questions);
+
+  if (!isStudyState(savedState)) {
+    const allProgress = sanitizeProgress(savedState, questionMap, questions);
+    return {
+      version: 2,
+      activeStudySetId: 'all',
+      studySets: {
+        all: createAllStudySet(),
+      },
+      progressByStudySetId: {
+        all: allProgress,
+      },
+    };
+  }
+
+  const studySets = {
+    all: createAllStudySet(),
+  };
+
+  Object.entries(savedState.studySets || {}).forEach(([id, studySet]) => {
+    if (!studySet || typeof studySet !== 'object') return;
+    if (id === 'all' || studySet.type === 'all') return;
+    if (studySet.type !== 'block') return;
+    if (typeof studySet.blockSize !== 'number') return;
+    if (typeof studySet.blockIndex !== 'number') return;
+    if (!Array.isArray(studySet.questionIds)) return;
+
+    const questionIds = [...new Set(studySet.questionIds.map(String))]
+      .filter((questionId) => questionMap.has(questionId));
+
+    if (questionIds.length === 0) return;
+
+    studySets[id] = {
+      ...studySet,
+      id,
+      questionIds,
+      label: studySet.label || `Blocco ${studySet.blockIndex + 1}`,
+      rangeLabel: studySet.rangeLabel || '',
+    };
+  });
+
+  const progressByStudySetId = {};
+  Object.entries(studySets).forEach(([id, studySet]) => {
+    const allowedIds = studySet.type === 'block' ? studySet.questionIds : null;
+    progressByStudySetId[id] = sanitizeProgress(
+      savedState.progressByStudySetId?.[id],
+      questionMap,
+      questions,
+      allowedIds
+    );
+  });
+
+  const activeStudySetId = studySets[savedState.activeStudySetId]
+    ? savedState.activeStudySetId
+    : 'all';
+
+  return {
+    version: 2,
+    activeStudySetId,
+    studySets,
+    progressByStudySetId,
+  };
+}
+
+function isStudyState(value) {
+  return Boolean(
+    value
+      && typeof value === 'object'
+      && value.progressByStudySetId
+      && typeof value.progressByStudySetId === 'object'
+      && value.studySets
+      && typeof value.studySets === 'object'
+  );
 }
 
 export function getPercent(value, total) {

@@ -6,6 +6,16 @@ export function loadProgress() {
     if (!raw) return null;
 
     const parsed = JSON.parse(raw);
+
+    if (
+      parsed
+      && typeof parsed === 'object'
+      && parsed.studySets
+      && parsed.progressByStudySetId
+    ) {
+      return parsed;
+    }
+
     if (!parsed || !Array.isArray(parsed.questionOrder)) return null;
     if (typeof parsed.currentIndex !== 'number') return null;
 

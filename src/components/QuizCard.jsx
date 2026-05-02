@@ -2,6 +2,7 @@ export default function QuizCard({
   question,
   displayIndex,
   total,
+  contextLabel,
   answers,
   selectedAnswer,
   result,
@@ -30,6 +31,7 @@ export default function QuizCard({
       <div className="quiz-card__top">
         <div>
           <p className="eyebrow">{reviewMode ? 'Ripasso errori' : `Domanda ${displayIndex} di ${total}`}</p>
+          {contextLabel && <p className="question-context">{contextLabel}</p>}
           <p className="question-id">ID domanda: {question.id || 'non disponibile'}</p>
         </div>
         <div className="quiz-card__top-actions">
