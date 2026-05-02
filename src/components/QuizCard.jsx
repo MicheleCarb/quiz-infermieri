@@ -66,7 +66,7 @@ export default function QuizCard({
 
       <div className="quiz-card__footer">
         {selectedAnswer && (
-          <button className="button button--primary" type="button" onClick={onNext}>
+          <button className="button button--primary quiz-card__next-inline" type="button" onClick={onNext}>
             {reviewMode ? 'Prossimo errore' : 'Prossima domanda'}
           </button>
         )}

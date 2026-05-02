@@ -34,7 +34,7 @@ button {
 .app-header {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 6px;
   margin-bottom: 16px;
 }
 
@@ -49,6 +49,11 @@ button {
 .app-header h1 {
   font-size: 2rem;
   line-height: 1.08;
+}
+
+.app-header .source {
+  margin-top: 6px;
+  line-height: 1.25;
 }
 
 .source,
@@ -297,6 +302,10 @@ button {
   margin: 0;
 }
 
+.sticky-next {
+  display: none;
+}
+
 .button {
   min-height: 46px;
   padding: 11px 15px;
@@ -438,6 +447,36 @@ button {
   margin: 0;
   color: #9f1f1f;
   font-weight: 700;
+}
+
+@media (max-width: 719px) {
+  .app-shell--sticky-next {
+    padding-bottom: calc(max(28px, env(safe-area-inset-bottom)) + 86px);
+  }
+
+  .quiz-card__next-inline {
+    display: none;
+  }
+
+  .sticky-next {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 50;
+    display: block;
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+    border-top: 1px solid #d9e0e8;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 -12px 28px rgba(17, 24, 39, 0.12);
+  }
+
+  .sticky-next .button {
+    width: min(100%, 860px);
+    min-height: 52px;
+    margin: 0 auto;
+    display: block;
+  }
 }
 
 @media (min-width: 720px) {

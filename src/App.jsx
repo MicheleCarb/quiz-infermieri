@@ -48,6 +48,14 @@ export default function App() {
   const currentQuestion = currentQuestionId ? questionMap.get(String(currentQuestionId)) : null;
   const isFinished = !reviewMode && progress && progress.currentIndex >= progress.questionOrder.length;
   const isReviewFinished = reviewMode && reviewOrder.length > 0 && reviewIndex >= reviewOrder.length;
+  const showStickyNext = Boolean(
+    selectedAnswer
+      && currentQuestion
+      && !historyMode
+      && !isFinished
+      && !isReviewFinished
+      && !(reviewMode && reviewOrder.length === 0)
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -260,11 +268,11 @@ export default function App() {
   }
 
   return (
-    <Shell>
+    <Shell stickyNext={showStickyNext}>
       <header className="app-header">
         <div>
-          <p className="source">{metadata?.source || 'Quiz infermieristica'}</p>
           <h1>I quiz di Kikka 🐵</h1>
+          <p className="source">{metadata?.source || 'Quiz infermieristica'}</p>
         </div>
       </header>
 
@@ -345,12 +353,19 @@ export default function App() {
           </button>
         </div>
       )}
+      {showStickyNext && (
+        <div className="sticky-next">
+          <button className="button button--primary" type="button" onClick={handleNext}>
+            {reviewMode ? 'Prossimo errore' : 'Prossima domanda'}
+          </button>
+        </div>
+      )}
     </Shell>
   );
 }
 
-function Shell({ children }) {
-  return <div className="app-shell">{children}</div>;
+function Shell({ children, stickyNext = false }) {
+  return <div className={`app-shell${stickyNext ? ' app-shell--sticky-next' : ''}`}>{children}</div>;
 }
 
 function FinalScreen({ total, correctCount, wrongCount, mistakesCount, historyCount, onReview, onHistory }) {
@@ -370,7 +385,7 @@ function FinalScreen({ total, correctCount, wrongCount, mistakesCount, historyCo
       </div>
       <div className="final__actions">
         {mistakesCount > 0 && (
-          <button className="button button--primary" type="button" onClick={onReview}>
+          <button className="button button--secondary" type="button" onClick={onReview}>
             Ripassa errori
           </button>
         )}
