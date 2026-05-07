@@ -5,6 +5,7 @@ import ReviewMistakesButton from './components/ReviewMistakesButton.jsx';
 import MistakeHistory from './components/MistakeHistory.jsx';
 import { shuffle } from './utils/shuffle';
 import { loadProgress, saveProgress } from './utils/storage';
+import { DEFAULT_QUIZ_BANK, QUIZ_BANKS } from './config/quizBanks';
 import {
   buildQuestionMap,
   createInitialProgressForIds,
@@ -15,16 +16,17 @@ import {
 } from './utils/quizEngine';
 import { getRandomMonkeyGif, loadMonkeyGifs } from './utils/monkeyGifs';
 
-const QUESTIONS_URL = `${import.meta.env.BASE_URL}data/questions.json`;
 const EXPORT_APP_ID = 'quiz-kikka';
 const EXPORT_SCHEMA_VERSION = 2;
 const LEGACY_EXPORT_SCHEMA_VERSION = 1;
-const QUIZ_ID = 'asl-bari-infermieri';
+const LEGACY_QUIZ_ID = 'asl-bari-infermieri';
 const BLOCK_SIZES = [500, 1000];
 
 export default function App() {
+  const [activeQuizBank, setActiveQuizBank] = useState(DEFAULT_QUIZ_BANK);
   const [status, setStatus] = useState('loading');
   const [loadError, setLoadError] = useState('');
+  const [quizBankMessage, setQuizBankMessage] = useState('');
   const [questions, setQuestions] = useState([]);
   const [metadata, setMetadata] = useState(null);
   const [studyState, setStudyState] = useState(null);
@@ -40,7 +42,11 @@ export default function App() {
   const [historyMode, setHistoryMode] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
   const [transferMessage, setTransferMessage] = useState('');
+  const [studyModalOpen, setStudyModalOpen] = useState(false);
+  const [studyModalMode, setStudyModalMode] = useState('all');
   const fileInputRef = useRef(null);
+  const studyChangeButtonRef = useRef(null);
+  const studyModalCloseRef = useRef(null);
 
   const questionMap = useMemo(() => buildQuestionMap(questions), [questions]);
   const total = questions.length;
@@ -97,9 +103,14 @@ export default function App() {
     async function loadQuestions() {
       try {
         setStatus('loading');
-        const response = await fetch(QUESTIONS_URL);
+        if (!activeQuizBank.available) {
+          setStatus('unavailable');
+          return;
+        }
+
+        const response = await fetch(activeQuizBank.questionsUrl);
         if (!response.ok) {
-          throw new Error(`Impossibile caricare ${QUESTIONS_URL}: HTTP ${response.status}`);
+          throw new Error(`Impossibile caricare ${activeQuizBank.questionsUrl}: HTTP ${response.status}`);
         }
 
         const data = await response.json();
@@ -116,9 +127,9 @@ export default function App() {
         }
 
         const map = buildQuestionMap(loadedQuestions);
-        const restored = sanitizeStudyState(loadProgress(), map, loadedQuestions);
+        const restored = sanitizeStudyState(loadProgress(activeQuizBank.quizId), map, loadedQuestions);
         setStudyState(restored);
-        saveProgress(restored);
+        saveProgress(restored, activeQuizBank.quizId);
         setStatus('ready');
       } catch (error) {
         if (!cancelled) {
@@ -133,7 +144,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [activeQuizBank]);
 
   useEffect(() => {
     let cancelled = false;
@@ -163,8 +174,36 @@ export default function App() {
   }, [currentQuestionId, currentQuestion, reviewAttempt]);
 
   useEffect(() => {
-    if (studyState) saveProgress(studyState);
-  }, [studyState]);
+    if (studyState) saveProgress(studyState, activeQuizBank.quizId);
+  }, [studyState, activeQuizBank.quizId]);
+
+  useEffect(() => {
+    setStudyModalMode(selectedBlockSize || 'all');
+  }, [selectedBlockSize]);
+
+  useEffect(() => {
+    if (!studyModalOpen) return;
+
+    studyModalCloseRef.current?.focus();
+
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') closeStudyModal();
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [studyModalOpen]);
+
+  function closeStudyModal() {
+    setQuizBankMessage('');
+    setStudyModalOpen(false);
+    window.setTimeout(() => studyChangeButtonRef.current?.focus(), 0);
+  }
+
+  function openStudyModal() {
+    setQuizBankMessage('');
+    setStudyModalOpen(true);
+  }
 
   function updateActiveProgress(updater) {
     setStudyState((previous) => {
@@ -323,24 +362,53 @@ export default function App() {
     return true;
   }
 
+  function handleChooseQuizBank(quizBank) {
+    if (quizBank.quizId === activeQuizBank.quizId) return true;
+
+    if (!quizBank.available) {
+      setQuizBankMessage('La banca dati della prova scritta non è ancora disponibile.');
+      return false;
+    }
+
+    if (selectedAnswer) {
+      const confirmed = window.confirm('Vuoi cambiare prova? Potrai tornare ai progressi attuali in qualsiasi momento.');
+      if (!confirmed) return false;
+    }
+
+    closeTransferProgress();
+    setQuizBankMessage('');
+    setQuestions([]);
+    setMetadata(null);
+    setStudyState(null);
+    setSelectedAnswer(null);
+    setResult(null);
+    setFeedbackGif(null);
+    setHistoryMode(false);
+    exitReviewMode();
+    setActiveQuizBank(quizBank);
+    return true;
+  }
+
   function handleChooseAllQuestions() {
-    if (studyState?.activeStudySetId === 'all') return;
-    if (!prepareForStudySetChange()) return;
+    if (studyState?.activeStudySetId === 'all') return true;
+    if (!prepareForStudySetChange()) return false;
 
     setStudyState((previous) => ({
       ...previous,
       activeStudySetId: 'all',
     }));
+    return true;
   }
 
   function handlePrepareBlocks(blockSize) {
     setStudyState((previous) => ensureBlockStudySets(previous, questions, blockSize));
+    return true;
   }
 
   function handleChooseStudySet(studySetId) {
-    if (!studyState?.studySets?.[studySetId]) return;
-    if (studyState.activeStudySetId === studySetId) return;
-    if (!prepareForStudySetChange()) return;
+    if (!studyState?.studySets?.[studySetId]) return false;
+    if (studyState.activeStudySetId === studySetId) return true;
+    if (!prepareForStudySetChange()) return false;
 
     setStudyState((previous) => {
       const studySet = previous.studySets[studySetId];
@@ -358,6 +426,7 @@ export default function App() {
         },
       };
     });
+    return true;
   }
 
   function resetActiveProgress() {
@@ -416,8 +485,10 @@ export default function App() {
     const exportData = {
       app: EXPORT_APP_ID,
       schemaVersion: EXPORT_SCHEMA_VERSION,
-      quizId: QUIZ_ID,
-      source: metadata?.source || 'Quiz infermieristica',
+      competitionId: activeQuizBank.competitionId,
+      quizId: activeQuizBank.quizId,
+      quizLabel: activeQuizBank.label,
+      source: metadata?.source || activeQuizBank.description,
       totalQuestions: metadata?.totalQuestions || total,
       questionsHash: await getQuestionsHash(),
       exportedAt: new Date().toISOString(),
@@ -432,7 +503,7 @@ export default function App() {
     const link = document.createElement('a');
 
     link.href = url;
-    link.download = `quiz-kikka-progressi-${QUIZ_ID}.json`;
+    link.download = `quiz-kikka-progressi-${activeQuizBank.quizId}.json`;
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -462,7 +533,7 @@ export default function App() {
       if (!confirmed) return;
 
       const importedStudyState = validation.studyState || sanitizeStudyState(validation.progress, questionMap, questions);
-      saveProgress(importedStudyState);
+      saveProgress(importedStudyState, activeQuizBank.quizId);
       setStudyState(importedStudyState);
       setSelectedAnswer(null);
       setResult(null);
@@ -488,8 +559,8 @@ export default function App() {
       return invalidSave();
     }
 
-    if (parsed.quizId !== QUIZ_ID) {
-      return { ok: false, message: 'Questo salvataggio appartiene a un altro quiz.' };
+    if (getImportedQuizId(parsed) !== activeQuizBank.quizId) {
+      return { ok: false, message: "Questo salvataggio appartiene a un'altra prova." };
     }
 
     if (
@@ -588,6 +659,11 @@ export default function App() {
     return { ok: false, message: 'Questo file non sembra un salvataggio valido dei quiz.' };
   }
 
+  function getImportedQuizId(parsed) {
+    if (!parsed.quizId || parsed.quizId === LEGACY_QUIZ_ID) return 'preselettiva';
+    return parsed.quizId;
+  }
+
   if (status === 'loading') {
     return <Shell><main className="panel">Caricamento domande...</main></Shell>;
   }
@@ -614,6 +690,20 @@ export default function App() {
     );
   }
 
+  if (status === 'unavailable') {
+    return (
+      <Shell>
+        <main className="panel panel--message">
+          <h1>{activeQuizBank.label}</h1>
+          <p>La banca dati di questa prova non è ancora disponibile.</p>
+          <button className="button button--primary" type="button" onClick={() => handleChooseQuizBank(DEFAULT_QUIZ_BANK)}>
+            Torna alla prova preselettiva
+          </button>
+        </main>
+      </Shell>
+    );
+  }
+
   if (!progress) {
     return <Shell><main className="panel">Preparazione sessione...</main></Shell>;
   }
@@ -623,20 +713,47 @@ export default function App() {
       <header className="app-header">
         <div>
           <h1>I quiz di Kikka 🐵</h1>
-          <p className="source">{metadata?.source || 'Quiz infermieristica'}</p>
+          <p className="source">{activeQuizBank.competitionLabel}</p>
         </div>
       </header>
 
-      <StudySelector
-        studyState={studyState}
+      <StudySummary
+        activeQuizBank={activeQuizBank}
         activeStudySet={activeStudySet}
-        selectedBlockSize={selectedBlockSize}
-        blockSizes={BLOCK_SIZES}
-        total={total}
-        onChooseAll={handleChooseAllQuestions}
-        onPrepareBlocks={handlePrepareBlocks}
-        onChooseStudySet={handleChooseStudySet}
+        buttonRef={studyChangeButtonRef}
+        onOpen={openStudyModal}
       />
+
+      {studyModalOpen && (
+        <StudyModal
+          quizBanks={QUIZ_BANKS}
+          activeQuizBank={activeQuizBank}
+          message={quizBankMessage}
+          studyState={studyState}
+          activeStudySet={activeStudySet}
+          selectedMode={studyModalMode}
+          blockSizes={BLOCK_SIZES}
+          total={total}
+          closeButtonRef={studyModalCloseRef}
+          onClose={closeStudyModal}
+          onChangeMode={setStudyModalMode}
+          onChooseQuizBank={(quizBank) => {
+            if (handleChooseQuizBank(quizBank)) closeStudyModal();
+          }}
+          onChooseAll={() => {
+            setQuizBankMessage('');
+            if (handleChooseAllQuestions()) closeStudyModal();
+          }}
+          onPrepareBlocks={(blockSize) => {
+            setQuizBankMessage('');
+            handlePrepareBlocks(blockSize);
+          }}
+          onChooseStudySet={(studySetId) => {
+            setQuizBankMessage('');
+            if (handleChooseStudySet(studySetId)) closeStudyModal();
+          }}
+        />
+      )}
 
       <StatsBar
         completed={completedCount}
@@ -749,78 +866,129 @@ function Shell({ children, stickyNext = false }) {
   return <div className={`app-shell${stickyNext ? ' app-shell--sticky-next' : ''}`}>{children}</div>;
 }
 
-function StudySelector({
+function StudySummary({ activeQuizBank, activeStudySet, buttonRef, onOpen }) {
+  const studyLabel = getStudyContextLabel(activeStudySet);
+
+  return (
+    <section className="study-summary" aria-label="Studio corrente">
+      <div className="study-summary__text">
+        <span className="study-summary__label">Studio:</span>
+        <strong className="study-summary__current">{activeQuizBank.label} - {studyLabel}</strong>
+      </div>
+      <button
+        className="button button--quiet study-summary__button"
+        type="button"
+        ref={buttonRef}
+        aria-haspopup="dialog"
+        onClick={onOpen}
+      >
+        Cambia
+      </button>
+    </section>
+  );
+}
+
+function StudyModal({
+  quizBanks,
+  activeQuizBank,
+  message,
   studyState,
   activeStudySet,
-  selectedBlockSize,
+  selectedMode,
   blockSizes,
   total,
+  closeButtonRef,
+  onClose,
+  onChangeMode,
+  onChooseQuizBank,
   onChooseAll,
   onPrepareBlocks,
   onChooseStudySet,
 }) {
-  const [selectedMode, setSelectedMode] = useState(selectedBlockSize || 'all');
-  const [isOpen, setIsOpen] = useState(false);
-  const panelId = 'study-selector-panel';
-
-  useEffect(() => {
-    setSelectedMode(selectedBlockSize || 'all');
-  }, [selectedBlockSize]);
-
-  const activeLabel = activeStudySet?.type === 'block'
-    ? `${activeStudySet.label} - ${activeStudySet.rangeLabel}`
-    : 'Tutte le domande';
   const blockSets = Object.values(studyState.studySets || {})
     .filter((set) => set.type === 'block' && set.blockSize === selectedMode)
     .sort((a, b) => a.blockIndex - b.blockIndex);
 
   function chooseMode(mode) {
-    setSelectedMode(mode);
+    onChangeMode(mode);
     if (mode === 'all') {
       onChooseAll();
     } else {
       onPrepareBlocks(mode);
     }
-    setIsOpen(false);
   }
 
-  function chooseStudySet(studySetId) {
-    onChooseStudySet(studySetId);
-    setIsOpen(false);
+  function handleBackdropClick(event) {
+    if (event.target === event.currentTarget) onClose();
   }
 
   return (
-    <section className="study-selector">
-      <button
-        className="study-selector__summary"
-        type="button"
-        aria-expanded={isOpen}
-        aria-controls={panelId}
-        onClick={() => setIsOpen((open) => !open)}
+    <div className="study-modal-backdrop" role="presentation" onMouseDown={handleBackdropClick}>
+      <section
+        className="study-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="study-modal-title"
+        onMouseDown={(event) => event.stopPropagation()}
       >
-        <span className="study-selector__summary-text">
-          <span className="eyebrow">Scegli cosa studiare</span>
-          <span className="study-selector__current">Stai studiando: <strong>{activeLabel}</strong></span>
-        </span>
-        <span className="study-selector__toggle">{isOpen ? 'Chiudi' : 'Cambia'}</span>
-      </button>
+        <div className="study-modal__header">
+          <h2 id="study-modal-title">Cambia studio</h2>
+          <button
+            className="study-modal__close"
+            type="button"
+            ref={closeButtonRef}
+            aria-label="Chiudi"
+            onClick={onClose}
+          >
+            X
+          </button>
+        </div>
 
-      {isOpen && (
-        <div className="study-selector__panel" id={panelId}>
-          <div className="study-selector__modes" aria-label="Scegli cosa studiare">
+        <div className="study-modal__body">
+          <section className="study-modal__section" aria-labelledby="quiz-bank-title">
+            <h3 id="quiz-bank-title">Prova del concorso</h3>
+            <div className="study-modal__options">
+              {quizBanks.map((quizBank) => {
+                const isActive = quizBank.quizId === activeQuizBank.quizId;
+
+                return (
+                  <button
+                    className={`study-modal__option${isActive ? ' study-modal__option--active' : ''}`}
+                    type="button"
+                    key={quizBank.quizId}
+                    onClick={() => onChooseQuizBank(quizBank)}
+                    aria-pressed={isActive}
+                  >
+                    <span>
+                      <strong>{quizBank.label}</strong>
+                      <small>{quizBank.description}</small>
+                    </span>
+                    {!quizBank.available && <span className="study-modal__badge">In arrivo</span>}
+                  </button>
+                );
+              })}
+            </div>
+            {message && <p className="study-modal__message" role="status">{message}</p>}
+          </section>
+
+          <section className="study-modal__section" aria-labelledby="study-choice-title">
+            <h3 id="study-choice-title">Cosa vuoi studiare</h3>
+            <div className="study-modal__modes" aria-label="Scegli cosa studiare">
             <button
-              className={`study-selector__mode${selectedMode === 'all' ? ' study-selector__mode--active' : ''}`}
+              className={`study-modal__mode${selectedMode === 'all' ? ' study-modal__mode--active' : ''}`}
               type="button"
               onClick={() => chooseMode('all')}
+              aria-pressed={selectedMode === 'all'}
             >
               Tutte le domande
             </button>
             {blockSizes.map((blockSize) => (
               <button
-                className={`study-selector__mode${selectedMode === blockSize ? ' study-selector__mode--active' : ''}`}
+                className={`study-modal__mode${selectedMode === blockSize ? ' study-modal__mode--active' : ''}`}
                 type="button"
                 key={blockSize}
                 onClick={() => chooseMode(blockSize)}
+                aria-pressed={selectedMode === blockSize}
               >
                 Blocchi da {blockSize}
               </button>
@@ -828,7 +996,7 @@ function StudySelector({
           </div>
 
           {selectedMode !== 'all' && (
-            <div className="study-selector__blocks">
+            <div className="study-modal__blocks">
               {blockSets.length === 0 ? (
                 <p className="empty-state">Preparazione blocchi...</p>
               ) : (
@@ -839,10 +1007,11 @@ function StudySelector({
 
                   return (
                     <button
-                      className={`study-selector__block${isActive ? ' study-selector__block--active' : ''}`}
+                      className={`study-modal__block${isActive ? ' study-modal__block--active' : ''}`}
                       type="button"
                       key={studySet.id}
-                      onClick={() => chooseStudySet(studySet.id)}
+                      onClick={() => onChooseStudySet(studySet.id)}
+                      aria-pressed={isActive}
                     >
                       <span>{studySet.label}: {studySet.rangeLabel}</span>
                       <strong>{completed} / {studySet.questionIds.length}</strong>
@@ -850,14 +1019,24 @@ function StudySelector({
                   );
                 })
               )}
-              <p className="study-selector__note">Totale banca dati: {total} domande</p>
+              <p className="study-modal__note">Totale banca dati: {total} domande</p>
             </div>
           )}
+          </section>
         </div>
-      )}
-    </section>
+      </section>
+    </div>
   );
 }
+
+function getStudyContextLabel(activeStudySet) {
+  if (activeStudySet?.type === 'block') {
+    return `${activeStudySet.label} - ${activeStudySet.rangeLabel}`;
+  }
+
+  return 'Tutte le domande';
+}
+
 function TransferProgress({ fileInputRef, open, message, onToggle, onExport, onChooseImportFile, onImportFile }) {
   return (
     <details className="transfer-progress" open={open} onToggle={(event) => onToggle(event.currentTarget.open)}>

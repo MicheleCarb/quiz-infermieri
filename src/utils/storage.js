@@ -1,8 +1,10 @@
-const STORAGE_KEY = 'asl-bari-quiz-progress-v1';
+const LEGACY_STORAGE_KEY = 'asl-bari-quiz-progress-v1';
+const DEFAULT_QUIZ_ID = 'preselettiva';
 
-export function loadProgress() {
+export function loadProgress(quizId = DEFAULT_QUIZ_ID) {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(getStorageKey(quizId))
+      || (quizId === DEFAULT_QUIZ_ID ? localStorage.getItem(LEGACY_STORAGE_KEY) : null);
     if (!raw) return null;
 
     const parsed = JSON.parse(raw);
@@ -37,10 +39,14 @@ export function loadProgress() {
   }
 }
 
-export function saveProgress(progress) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+export function saveProgress(progress, quizId = progress?.quizId || DEFAULT_QUIZ_ID) {
+  localStorage.setItem(getStorageKey(quizId), JSON.stringify(progress));
 }
 
-export function clearProgress() {
-  localStorage.removeItem(STORAGE_KEY);
+export function clearProgress(quizId = DEFAULT_QUIZ_ID) {
+  localStorage.removeItem(getStorageKey(quizId));
+}
+
+export function getStorageKey(quizId = DEFAULT_QUIZ_ID) {
+  return `quiz-kikka-progress-${quizId}-v1`;
 }
