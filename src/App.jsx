@@ -44,6 +44,7 @@ export default function App() {
   const [transferMessage, setTransferMessage] = useState('');
   const [studyModalOpen, setStudyModalOpen] = useState(false);
   const [studyModalMode, setStudyModalMode] = useState('all');
+  const [moreActionsOpen, setMoreActionsOpen] = useState(false);
   const fileInputRef = useRef(null);
   const studyChangeButtonRef = useRef(null);
   const studyModalCloseRef = useRef(null);
@@ -308,6 +309,7 @@ export default function App() {
 
   function handleNext() {
     closeTransferProgress();
+    setMoreActionsOpen(false);
 
     if (reviewMode) {
       const remainingReviewIds = reviewOrder.filter((id) => progress?.mistakes[id]);
@@ -334,6 +336,7 @@ export default function App() {
     if (ids.length === 0) return;
 
     closeTransferProgress();
+    setMoreActionsOpen(false);
     setReviewOrder(shuffle(ids));
     setReviewIndex(0);
     setReviewAttempt(0);
@@ -354,6 +357,7 @@ export default function App() {
     }
 
     closeTransferProgress();
+    setMoreActionsOpen(false);
     setSelectedAnswer(null);
     setResult(null);
     setFeedbackGif(null);
@@ -376,6 +380,7 @@ export default function App() {
     }
 
     closeTransferProgress();
+    setMoreActionsOpen(false);
     setQuizBankMessage('');
     setQuestions([]);
     setMetadata(null);
@@ -449,6 +454,7 @@ export default function App() {
 
   function resetQuiz() {
     closeTransferProgress();
+    setMoreActionsOpen(false);
     const message = activeStudySet?.type === 'block'
       ? `Vuoi ricominciare ${activeStudySet.label} da capo?`
       : 'Vuoi ricominciare tutte le domande da capo?';
@@ -460,11 +466,19 @@ export default function App() {
 
   function openHistoryMode() {
     closeTransferProgress();
+    setMoreActionsOpen(false);
     setHistoryMode(true);
   }
 
   function closeTransferProgress() {
     setTransferOpen(false);
+  }
+
+  function toggleMoreActions() {
+    setMoreActionsOpen((isOpen) => {
+      if (isOpen) closeTransferProgress();
+      return !isOpen;
+    });
   }
 
   async function getQuestionsHash() {
@@ -823,32 +837,22 @@ export default function App() {
       {!reviewMode && !isFinished && !historyMode && (
         <div className="actions">
           <ReviewMistakesButton count={mistakesCount} onClick={startReviewMode} />
-          <button
-            className="button button--quiet"
-            type="button"
-            onClick={openHistoryMode}
-            disabled={reviewQuestionsCount === 0}
-          >
-            Domande da rivedere{reviewQuestionsCount > 0 ? ` (${reviewQuestionsCount})` : ''}
-          </button>
-        </div>
-      )}
-      {!reviewMode && !historyMode && !isFinished && currentQuestion && (
-        <TransferProgress
-          fileInputRef={fileInputRef}
-          open={transferOpen}
-          message={transferMessage}
-          onToggle={setTransferOpen}
-          onExport={handleExportProgress}
-          onChooseImportFile={handleChooseImportFile}
-          onImportFile={handleImportFile}
-        />
-      )}
-      {hasProgress && !reviewMode && !historyMode && !isFinished && currentQuestion && (
-        <div className="reset-actions">
-          <button className="button button--danger button--danger-soft" type="button" onClick={resetQuiz}>
-            Ricomincia da capo
-          </button>
+          <MoreActions
+            open={moreActionsOpen}
+            reviewQuestionsCount={reviewQuestionsCount}
+            hasProgress={hasProgress}
+            showTransfer={Boolean(currentQuestion)}
+            transferOpen={transferOpen}
+            transferMessage={transferMessage}
+            fileInputRef={fileInputRef}
+            onToggle={toggleMoreActions}
+            onHistory={openHistoryMode}
+            onTransferToggle={setTransferOpen}
+            onExport={handleExportProgress}
+            onChooseImportFile={handleChooseImportFile}
+            onImportFile={handleImportFile}
+            onReset={resetQuiz}
+          />
         </div>
       )}
       {showStickyNext && (
@@ -1035,6 +1039,70 @@ function getStudyContextLabel(activeStudySet) {
   }
 
   return 'Tutte le domande';
+}
+
+function MoreActions({
+  open,
+  reviewQuestionsCount,
+  hasProgress,
+  showTransfer,
+  transferOpen,
+  transferMessage,
+  fileInputRef,
+  onToggle,
+  onHistory,
+  onTransferToggle,
+  onExport,
+  onChooseImportFile,
+  onImportFile,
+  onReset,
+}) {
+  const panelId = 'more-actions-panel';
+
+  return (
+    <section className="more-actions">
+      <button
+        className="button button--quiet more-actions__toggle"
+        type="button"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={onToggle}
+      >
+        Altro <span aria-hidden="true">{open ? '▲' : '▼'}</span>
+      </button>
+
+      {open && (
+        <div className="more-actions__panel" id={panelId}>
+          <button
+            className="button button--quiet"
+            type="button"
+            onClick={onHistory}
+            disabled={reviewQuestionsCount === 0}
+          >
+            Domande da rivedere{reviewQuestionsCount > 0 ? ` (${reviewQuestionsCount})` : ''}
+          </button>
+
+          {showTransfer && (
+            <TransferProgress
+              fileInputRef={fileInputRef}
+              open={transferOpen}
+              message={transferMessage}
+              onToggle={onTransferToggle}
+              onExport={onExport}
+              onChooseImportFile={onChooseImportFile}
+              onImportFile={onImportFile}
+            />
+          )}
+
+          {hasProgress && (
+            <button className="button button--danger button--danger-soft" type="button" onClick={onReset}>
+              Ricomincia da capo
+            </button>
+          )}
+        </div>
+      )}
+    </section>
+  );
 }
 
 function TransferProgress({ fileInputRef, open, message, onToggle, onExport, onChooseImportFile, onImportFile }) {

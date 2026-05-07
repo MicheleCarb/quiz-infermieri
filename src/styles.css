@@ -618,9 +618,30 @@ button {
   margin-top: 16px;
 }
 
-.actions .button,
-.reset-actions .button {
+.actions .button {
   width: 100%;
+}
+
+.more-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.more-actions__toggle {
+  justify-content: center;
+}
+
+.more-actions__panel {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #d9e0e8;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.more-actions .transfer-progress {
+  margin-top: 0;
 }
 
 .transfer-progress {
@@ -664,11 +685,6 @@ button {
 .transfer-progress__message {
   color: #1f625e;
   font-weight: 700;
-}
-
-.reset-actions {
-  display: grid;
-  margin-top: 12px;
 }
 
 .panel--message {
@@ -903,14 +919,6 @@ button {
 
   .transfer-progress__actions {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .reset-actions {
-    justify-content: end;
-  }
-
-  .reset-actions .button {
-    width: auto;
   }
 
   .history__top {
