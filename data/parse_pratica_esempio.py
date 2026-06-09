@@ -10,6 +10,7 @@ import re
 
 INPUT_FILE = "quiz_raw_pratica_esempio.txt"
 OUTPUT_FILE = "questions-pratica-esempio.json"
+PUBLIC_OUTPUT_FILE = os.path.join("..", "public", "data", OUTPUT_FILE)
 
 SOURCE_NAME = "Prova Pratica Esempio"
 ANSWER_COUNT = 3
@@ -208,6 +209,10 @@ def save_json(questions, output_path):
         "questions": questions,
     }
 
+    output_dir = os.path.dirname(output_path)
+    if output_dir and not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
     with io.open(output_path, "w", encoding="utf-8") as file:
         json.dump(data, file, ensure_ascii=False, indent=2)
         file.write("\n")
@@ -229,6 +234,7 @@ def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     input_path = os.path.join(script_dir, INPUT_FILE)
     output_path = os.path.join(script_dir, OUTPUT_FILE)
+    public_output_path = os.path.normpath(os.path.join(script_dir, PUBLIC_OUTPUT_FILE))
 
     if not os.path.exists(input_path):
         raise SystemExit("File non trovato: {}".format(input_path))
@@ -236,6 +242,7 @@ def main():
     topics = parse_topics(input_path)
     questions = build_questions(topics)
     save_json(questions, output_path)
+    save_json(questions, public_output_path)
     print_report(topics, questions)
 
 
