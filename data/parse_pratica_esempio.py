@@ -16,7 +16,10 @@ SOURCE_NAME = "Prova Pratica Esempio"
 ANSWER_COUNT = 3
 
 STEP_RE = re.compile(r"^([A-Z])\.\s*(.*)")
+NUMBERED_TOPIC_RE = re.compile(r"^\d+\)\s*(.*)")
+NUMBERED_STEP_RE = re.compile(r"^(\d+)\.\s*(.*)")
 COMMENT_RE = re.compile(r"^\s*#")
+INSTRUCTION_RE = re.compile(r"^Identificare la sequenza corretta:?\s*$", re.IGNORECASE)
 
 
 def normalize_spaces(text):
@@ -37,7 +40,8 @@ def shuffle_with_seed(items, seed):
 
 
 def is_ignored_line(line):
-    return not line.strip() or COMMENT_RE.match(line)
+    stripped = line.strip()
+    return not stripped or COMMENT_RE.match(line) or INSTRUCTION_RE.match(stripped)
 
 
 def new_topic(title):
@@ -58,6 +62,15 @@ def parse_topics(input_path):
 
             stripped = raw_line.strip()
             step_match = STEP_RE.match(stripped)
+            numbered_step_match = NUMBERED_STEP_RE.match(stripped)
+            numbered_topic_match = NUMBERED_TOPIC_RE.match(stripped)
+
+            if numbered_topic_match:
+                if current_topic is not None:
+                    topics.append(current_topic)
+
+                current_topic = new_topic(numbered_topic_match.group(1))
+                continue
 
             if step_match and current_topic is not None:
                 current_topic["steps"].append(
@@ -68,7 +81,22 @@ def parse_topics(input_path):
                 )
                 continue
 
+            if numbered_step_match and current_topic is not None:
+                current_topic["steps"].append(
+                    {
+                        "sourceLabel": numbered_step_match.group(1),
+                        "text": normalize_spaces(numbered_step_match.group(2)),
+                    }
+                )
+                continue
+
             if current_topic is not None and current_topic["steps"] and raw_line[:1].isspace():
+                current_topic["steps"][-1]["text"] = normalize_spaces(
+                    current_topic["steps"][-1]["text"] + " " + stripped
+                )
+                continue
+
+            if current_topic is not None and current_topic["steps"] and current_topic["steps"][-1]["sourceLabel"].isdigit():
                 current_topic["steps"][-1]["text"] = normalize_spaces(
                     current_topic["steps"][-1]["text"] + " " + stripped
                 )
