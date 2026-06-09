@@ -909,6 +909,8 @@ function StudyModal({
   onPrepareBlocks,
   onChooseStudySet,
 }) {
+  const availableBlockSizes = blockSizes.filter((blockSize) => total >= blockSize);
+  const canChooseBlocks = availableBlockSizes.length > 0;
   const blockSets = Object.values(studyState.studySets || {})
     .filter((set) => set.type === 'block' && set.blockSize === selectedMode)
     .sort((a, b) => a.blockIndex - b.blockIndex);
@@ -975,58 +977,60 @@ function StudyModal({
             {message && <p className="study-modal__message" role="status">{message}</p>}
           </section>
 
-          <section className="study-modal__section" aria-labelledby="study-choice-title">
-            <h3 id="study-choice-title">Cosa vuoi studiare</h3>
-            <div className="study-modal__modes" aria-label="Scegli cosa studiare">
-            <button
-              className={`study-modal__mode${selectedMode === 'all' ? ' study-modal__mode--active' : ''}`}
-              type="button"
-              onClick={() => chooseMode('all')}
-              aria-pressed={selectedMode === 'all'}
-            >
-              Tutte le domande
-            </button>
-            {blockSizes.map((blockSize) => (
-              <button
-                className={`study-modal__mode${selectedMode === blockSize ? ' study-modal__mode--active' : ''}`}
-                type="button"
-                key={blockSize}
-                onClick={() => chooseMode(blockSize)}
-                aria-pressed={selectedMode === blockSize}
-              >
-                Blocchi da {blockSize}
-              </button>
-            ))}
-          </div>
+          {canChooseBlocks && (
+            <section className="study-modal__section" aria-labelledby="study-choice-title">
+              <h3 id="study-choice-title">Cosa vuoi studiare</h3>
+              <div className="study-modal__modes" aria-label="Scegli cosa studiare">
+                <button
+                  className={`study-modal__mode${selectedMode === 'all' ? ' study-modal__mode--active' : ''}`}
+                  type="button"
+                  onClick={() => chooseMode('all')}
+                  aria-pressed={selectedMode === 'all'}
+                >
+                  Tutte le domande
+                </button>
+                {availableBlockSizes.map((blockSize) => (
+                  <button
+                    className={`study-modal__mode${selectedMode === blockSize ? ' study-modal__mode--active' : ''}`}
+                    type="button"
+                    key={blockSize}
+                    onClick={() => chooseMode(blockSize)}
+                    aria-pressed={selectedMode === blockSize}
+                  >
+                    Blocchi da {blockSize}
+                  </button>
+                ))}
+              </div>
 
-          {selectedMode !== 'all' && (
-            <div className="study-modal__blocks">
-              {blockSets.length === 0 ? (
-                <p className="empty-state">Preparazione blocchi...</p>
-              ) : (
-                blockSets.map((studySet) => {
-                  const blockProgress = studyState.progressByStudySetId[studySet.id];
-                  const completed = blockProgress ? Math.min(blockProgress.answeredIds.length, studySet.questionIds.length) : 0;
-                  const isActive = activeStudySet?.id === studySet.id;
+              {selectedMode !== 'all' && (
+                <div className="study-modal__blocks">
+                  {blockSets.length === 0 ? (
+                    <p className="empty-state">Preparazione blocchi...</p>
+                  ) : (
+                    blockSets.map((studySet) => {
+                      const blockProgress = studyState.progressByStudySetId[studySet.id];
+                      const completed = blockProgress ? Math.min(blockProgress.answeredIds.length, studySet.questionIds.length) : 0;
+                      const isActive = activeStudySet?.id === studySet.id;
 
-                  return (
-                    <button
-                      className={`study-modal__block${isActive ? ' study-modal__block--active' : ''}`}
-                      type="button"
-                      key={studySet.id}
-                      onClick={() => onChooseStudySet(studySet.id)}
-                      aria-pressed={isActive}
-                    >
-                      <span>{studySet.label}: {studySet.rangeLabel}</span>
-                      <strong>{completed} / {studySet.questionIds.length}</strong>
-                    </button>
-                  );
-                })
+                      return (
+                        <button
+                          className={`study-modal__block${isActive ? ' study-modal__block--active' : ''}`}
+                          type="button"
+                          key={studySet.id}
+                          onClick={() => onChooseStudySet(studySet.id)}
+                          aria-pressed={isActive}
+                        >
+                          <span>{studySet.label}: {studySet.rangeLabel}</span>
+                          <strong>{completed} / {studySet.questionIds.length}</strong>
+                        </button>
+                      );
+                    })
+                  )}
+                  <p className="study-modal__note">Totale banca dati: {total} domande</p>
+                </div>
               )}
-              <p className="study-modal__note">Totale banca dati: {total} domande</p>
-            </div>
+            </section>
           )}
-          </section>
         </div>
       </section>
     </div>

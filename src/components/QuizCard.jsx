@@ -18,6 +18,11 @@ export default function QuizCard({
 }) {
   const correctLabel = question.correctAnswer || 'A';
   const answerLetters = ['A', 'B', 'C'];
+  const isProcedureQuestion = Boolean(
+    question.procedureTopic
+      && Array.isArray(question.displayedSteps)
+      && question.displayedSteps.length > 0
+  );
 
   function answerClass(answer) {
     if (!selectedAnswer) return 'answer';
@@ -51,7 +56,11 @@ export default function QuizCard({
         </div>
       </div>
 
-      <h1>{question.question || 'Domanda senza testo'}</h1>
+      {isProcedureQuestion ? (
+        <ProcedureQuestion question={question} />
+      ) : (
+        <h1>{question.question || 'Domanda senza testo'}</h1>
+      )}
 
       <div className="answers" role="list">
         {answers.length === 0 ? (
@@ -92,6 +101,26 @@ export default function QuizCard({
         </p>
       </div>
     </article>
+  );
+}
+
+function ProcedureQuestion({ question }) {
+  return (
+    <section className="procedure-question" aria-labelledby={`procedure-question-${question.id}`}>
+      <div className="procedure-question__header">
+        <h1 id={`procedure-question-${question.id}`}>{question.procedureTopic}</h1>
+        <p>Identificare la sequenza corretta.</p>
+      </div>
+
+      <ol className="procedure-steps">
+        {question.displayedSteps.map((step) => (
+          <li className="procedure-step" key={`${step.number}-${step.originalNumber}`}>
+            <span className="procedure-step__number">{step.number}</span>
+            <span className="procedure-step__text">{step.text}</span>
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }
 

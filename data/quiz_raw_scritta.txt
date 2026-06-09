@@ -1,0 +1,16 @@
+# Prova scritta - quiz raw
+#
+# Incolla qui le nuove domande usando questa struttura:
+#
+# 1) Testo della domanda
+# A) Risposta corretta
+# B) Seconda risposta
+# C) Terza risposta
+# ID: 1234
+#
+# Note:
+# - per coerenza con la banca dati attuale, la risposta corretta resta A;
+# - le righe lunghe possono andare a capo: il parser le unira alla domanda
+#   o all'ultima risposta letta;
+# - quando prepareremo data/parse_questions.py per questa banca, useremo
+#   questo file come input e genereremo data/questions-scritta.json.

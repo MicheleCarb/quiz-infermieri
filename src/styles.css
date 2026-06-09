@@ -46,6 +46,10 @@ button {
   letter-spacing: 0;
 }
 
+.quiz-card h1 {
+  white-space: pre-line;
+}
+
 .app-header h1 {
   font-size: 2rem;
   line-height: 1.08;
@@ -365,6 +369,66 @@ button {
   margin-bottom: 18px;
 }
 
+.procedure-question {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.procedure-question__header {
+  display: grid;
+  gap: 3px;
+}
+
+.procedure-question__header h1 {
+  margin-bottom: 0;
+}
+
+.procedure-question__header p {
+  margin: 0;
+  color: #475569;
+  font-weight: 800;
+}
+
+.procedure-steps {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.procedure-step {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 9px;
+  align-items: start;
+  padding: 8px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.procedure-step__number {
+  display: grid;
+  place-items: center;
+  min-width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: #e8eef6;
+  color: #22476d;
+  font-size: 0.84rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.procedure-step__text {
+  color: #172026;
+  font-size: 0.94rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
 .answers {
   display: grid;
   gap: 10px;
@@ -471,6 +535,26 @@ button {
   .quiz-card h1 {
     font-size: 1.18rem;
     line-height: 1.32;
+  }
+
+  .procedure-question {
+    gap: 10px;
+  }
+
+  .procedure-step {
+    grid-template-columns: 30px 1fr;
+    gap: 8px;
+    padding: 7px 8px;
+  }
+
+  .procedure-step__number {
+    min-width: 25px;
+    height: 25px;
+    font-size: 0.78rem;
+  }
+
+  .procedure-step__text {
+    font-size: 0.88rem;
   }
 
   .quiz-card__top-actions {
@@ -909,6 +993,14 @@ button {
 
   .quiz-card h1 {
     font-size: 1.55rem;
+  }
+
+  .procedure-question__header h1 {
+    font-size: 1.38rem;
+  }
+
+  .procedure-step__text {
+    font-size: 0.96rem;
   }
 
   .final__actions {

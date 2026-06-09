@@ -22,7 +22,16 @@ export const QUIZ_BANKS = [
     available: false,
     default: false,
   },
+  {
+    quizId: 'pratica-esempio',
+    competitionId: COMPETITION_ID,
+    competitionLabel: COMPETITION_LABEL,
+    label: 'Prova pratica esempio',
+    description: 'Procedure pratiche in sequenza',
+    questionsUrl: `${import.meta.env.BASE_URL}data/questions-pratica-esempio.json`,
+    available: true,
+    default: false,
+  },
 ];
 
 export const DEFAULT_QUIZ_BANK = QUIZ_BANKS.find((bank) => bank.default) || QUIZ_BANKS[0];
-
