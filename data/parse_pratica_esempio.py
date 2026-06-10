@@ -117,20 +117,91 @@ def format_sequence(numbers):
     return "-".join(str(number) for number in numbers)
 
 
-def make_distractor_sequence(correct_sequence, seed):
-    rng = random.Random(seed)
-    candidate = list(correct_sequence)
+def get_locked_positions(sequence_length):
+    if sequence_length <= 4:
+        return set()
 
-    if len(candidate) < 2:
+    first_locked_count = 2 if sequence_length >= 6 else 1
+    locked = set(range(first_locked_count))
+    locked.add(sequence_length - 1)
+    return locked
+
+
+def get_middle_positions(sequence_length):
+    locked = get_locked_positions(sequence_length)
+    return [
+        index
+        for index in range(sequence_length)
+        if index not in locked
+    ]
+
+
+def swap_adjacent_middle(sequence, rng):
+    candidate = list(sequence)
+    middle_positions = get_middle_positions(len(candidate))
+    adjacent_pairs = [
+        (left, left + 1)
+        for left in middle_positions
+        if left + 1 in middle_positions
+    ]
+
+    if not adjacent_pairs:
         return candidate
 
-    for _ in range(20):
-        rng.shuffle(candidate)
+    left, right = rng.choice(adjacent_pairs)
+    candidate[left], candidate[right] = candidate[right], candidate[left]
+    return candidate
+
+
+def move_middle_step(sequence, rng):
+    candidate = list(sequence)
+    middle_positions = get_middle_positions(len(candidate))
+
+    if len(middle_positions) < 3:
+        return swap_adjacent_middle(sequence, rng)
+
+    from_index = rng.choice(middle_positions)
+    possible_to_indexes = [
+        index
+        for index in middle_positions
+        if index != from_index and abs(index - from_index) <= 2
+    ]
+
+    if not possible_to_indexes:
+        return swap_adjacent_middle(sequence, rng)
+
+    item = candidate.pop(from_index)
+    to_index = rng.choice(possible_to_indexes)
+    candidate.insert(to_index, item)
+    return candidate
+
+
+def double_near_miss(sequence, rng):
+    candidate = swap_adjacent_middle(sequence, rng)
+    return move_middle_step(candidate, rng)
+
+
+def make_distractor_sequence(correct_sequence, seed):
+    rng = random.Random(seed)
+
+    if len(correct_sequence) < 2:
+        return list(correct_sequence)
+
+    builders = [swap_adjacent_middle]
+
+    if len(correct_sequence) >= 5:
+        builders.append(move_middle_step)
+
+    if len(correct_sequence) >= 8:
+        builders.append(double_near_miss)
+
+    for _ in range(60):
+        builder = rng.choice(builders)
+        candidate = builder(correct_sequence, rng)
         if candidate != correct_sequence:
             return candidate
 
-    candidate[0], candidate[1] = candidate[1], candidate[0]
-    return candidate
+    return swap_adjacent_middle(correct_sequence, rng)
 
 
 def build_answers(correct_sequence, question_seed):
@@ -149,6 +220,12 @@ def build_answers(correct_sequence, question_seed):
         attempt += 1
         if attempt > 200:
             break
+
+    if len(sequences) < ANSWER_COUNT:
+        fallback = list(reversed(correct_sequence))
+        if fallback != correct_sequence and tuple(fallback) not in used:
+            sequences.append(fallback)
+            used.add(tuple(fallback))
 
     ordered_sequences = shuffle_with_seed(sequences, question_seed + 2000)
     answers = []
