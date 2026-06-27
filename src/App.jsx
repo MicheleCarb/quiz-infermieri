@@ -711,7 +711,7 @@ export default function App() {
           <h1>{activeQuizBank.label}</h1>
           <p>La banca dati di questa prova non è ancora disponibile.</p>
           <button className="button button--primary" type="button" onClick={() => handleChooseQuizBank(DEFAULT_QUIZ_BANK)}>
-            Torna alla prova preselettiva
+            Torna a {DEFAULT_QUIZ_BANK.label.toLowerCase()}
           </button>
         </main>
       </Shell>

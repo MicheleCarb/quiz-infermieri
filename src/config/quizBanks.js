@@ -10,7 +10,7 @@ export const QUIZ_BANKS = [
     description: 'Banca dati prova preselettiva',
     questionsUrl: `${import.meta.env.BASE_URL}data/questions.json`,
     available: true,
-    default: true,
+    default: false,
   },
   {
     quizId: 'scritta',
@@ -19,8 +19,8 @@ export const QUIZ_BANKS = [
     label: 'Prova scritta',
     description: 'Banca dati prova scritta',
     questionsUrl: `${import.meta.env.BASE_URL}data/questions-scritta.json`,
-    available: false,
-    default: false,
+    available: true,
+    default: true,
   },
   {
     quizId: 'pratica-esempio',

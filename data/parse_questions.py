@@ -32,6 +32,7 @@ def is_ignored_line(line):
 
     ignored_patterns = [
         r"^ASL BARI\s*-\s*CONCORSO UNICO REGIONALE INFERMIERI(?:\s+Pagina\s+\d+)?$",
+        r"^ASL BARI\s*-\s*CONCORSO UNICO INFERMIERE\s*-\s*PROVA SCRITTA(?:\s+Pagina\s+\d+)?$",
         r"^Pagina\s+\d+$",
         r"^N\.B\.\s*Per facilitare la consultazione",
     ]
